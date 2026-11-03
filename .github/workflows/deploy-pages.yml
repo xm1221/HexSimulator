@@ -51,12 +51,7 @@ jobs:
 
       - if: steps.creds.outputs.present == 'true'
         name: Deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Same account as HexTools; public account id (not a secret).
-          accountId: ab2343f4691dfe98689e375fc23d4121
-          # Pin wrangler 4 — action's default 3.x hits Pages API routing errors on this account.
-          wranglerVersion: "4.157.0"
-          packageManager: npm
-          command: pages deploy dist --project-name=hexsimulator --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ab2343f4691dfe98689e375fc23d4121
+        run: npx --yes wrangler@4.157.0 pages deploy dist --project-name=hexsimulator --branch=main
