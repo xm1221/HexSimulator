@@ -190,3 +190,17 @@ export function toSnapshot(response: RpcResponse): CastSnapshot {
     ok: response.ok === true,
   };
 }
+
+/**
+ * Carry the last known stack forward when a command did not report one.
+ *
+ * `reset`, `step.abort`, `ping`, `step.begin` and the like legitimately omit
+ * the stack; keeping the previous value avoids blanking the panel. A command
+ * that *does* report a stack always wins, including an empty one.
+ */
+export function mergeStack(previous: CastSnapshot | null, next: CastSnapshot): CastSnapshot {
+  if (next.stack !== null || previous?.stack == null) {
+    return next;
+  }
+  return { ...next, stack: previous.stack };
+}

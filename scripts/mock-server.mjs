@@ -121,9 +121,10 @@ export function createMockServer({ token = null } = {}) {
         continue;
       }
       // Unknown token: echo it as a pattern iota so the glyph path is covered.
-      const [dir, angles] = raw.includes("_")
-        ? raw.split("_")
-        : ["EAST", raw];
+      // `DIR_signature` splits on the last underscore (directions contain one).
+      const underscore = raw.lastIndexOf("_");
+      const [dir, angles] =
+        underscore > 0 ? [raw.slice(0, underscore), raw.slice(underscore + 1)] : ["EAST", raw];
       next.push(iota.pattern(dir, angles));
     }
     return castReply({ stack: next });

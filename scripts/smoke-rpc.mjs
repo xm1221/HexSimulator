@@ -88,7 +88,7 @@ async function main() {
       pathToFileURL(path.join(dir, "hexparse.js")).href
     );
     const { RpcClient, RpcError, normalizeEndpoints } = clientModule;
-    const { toSnapshot } = typesModule;
+    const { toSnapshot, mergeStack } = typesModule;
     const { parseHex, parseToResolvedPatterns, patternsToCode } =
       hexparseModule;
 
@@ -308,6 +308,21 @@ async function main() {
     equal("prefers data.cast.stack", castWins.stack?.[0]?.value, 3);
     const noStack = toSnapshot({ ok: true, data: {} });
     equal("missing stack is null, not []", noStack.stack, null);
+
+    const previous = toSnapshot({
+      ok: true,
+      data: { stack: [{ type: "hexcasting:double", text: "3.00", value: 3 }] },
+    });
+    equal(
+      "mergeStack keeps the stack when a command omits it",
+      mergeStack(previous, noStack).stack?.[0]?.value,
+      3,
+    );
+    equal(
+      "mergeStack accepts an explicitly empty stack",
+      mergeStack(previous, toSnapshot({ ok: true, data: { stack: [] } })).stack,
+      [],
+    );
 
     // ---- network errors --------------------------------------------------
     console.log("\nnetwork error");

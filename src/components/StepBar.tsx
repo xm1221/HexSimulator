@@ -27,10 +27,6 @@ export default function StepBar({
 }: StepBarProps) {
   const { t } = useI18n();
 
-  if (!active && step == null) {
-    return null;
-  }
-
   return (
     <div className="step-bar">
       <div className="step-bar__actions">

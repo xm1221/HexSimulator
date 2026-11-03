@@ -25,13 +25,30 @@
 { "id": 1, "cmd": "run", "code": "num_1 num_2 add" }
 ```
 
-常用 `cmd`：`ping`、`run`、`reset`、`stack`、`step.begin`、`step.next`、`step.abort`、`complete`。
+常用 `cmd`：`ping`、`run`、`reset`、`stack`、`step.begin`、`step.next`、`step.abort`、`complete`（可选 `profile.*`、`env.*`）。
+
+### `code`（hexParse）语法
+
+`code` 是空格分隔的 hexParse 源码。服务端至少应接受 HexSimulator 会发送、用户会输入的这些形式：
+
+| 形式 | 示例 | 含义 |
+|------|------|------|
+| `num_<n>` | `num_3`、`num_-12.5` | 数字字面量 |
+| 图案名 | `add`、`hexcasting:add` | 按别名 / id 查找已注册图案 |
+| `方向_签名` | `NORTH_EAST_waaw` | 显式起点方向 + 角度字母 |
+| `_签名` | `_waaw` | 角度字母，默认方向（EAST） |
+| 仅签名 | `waaw` | 等同 `_waaw` |
+| `mask_<遮罩>` | `mask_-v--` | HexBug 遮罩 |
+| 特殊记号 | `{` `}` `(` `)` `\` `intro` `retro` `escape` | 括号 / 转义 |
+
+HexSimulator 的「画出的图案」模式始终发送 `方向_签名` token，因此服务端只要支持该形式加上 `num_<n>` 和图案名，画布就能完整使用。
 
 ## 响应要点
 
 - `ok`：无 mishap / 无致命错误时为 `true`。
 - `data.cast.stack`：iota 数组，**底 → 顶**；无 cast 时看 `data.stack`。
-- iota：`type`/`text`/`color`/`rich`；图案带 `pattern.startDir`+`angles`；列表带 `children`。
+- iota：`type`/`text`/`color`/`rich`；数字/布尔带 `value`，图案带 `pattern.startDir`+`angles`，实体带 `entity`，列表带递归 `children`。
+- `data.step`（`step.begin` / `step.next`）：`total`、`index`（**下一个**待执行 iota 的下标，0 起，完成时等于 `total`）、`done`，可选 `executed`（最近一次 `step.next` 执行的下标）、`preview`（未完成时的下一个 iota，可省略 `rich`/`children`）、`stopped`（如 `"mishap"`）。
 
 ## 本地启用（MieLib）
 

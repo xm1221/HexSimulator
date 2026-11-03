@@ -42,6 +42,24 @@ Also see: [PROTOCOL.zh-CN.md](./PROTOCOL.zh-CN.md) (Chinese-first mirror).
 | `label` | string | no | Label for step sessions |
 | `token` | string | if server requires | Alternative to `Authorization` header |
 
+### `code` syntax (hexParse)
+
+`code` is whitespace-separated hexParse source. Servers are expected to accept at least the token
+forms HexSimulator emits and lets users type:
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| `num_<n>` | `num_3`, `num_-12.5` | Number literal |
+| Pattern name | `add`, `hexcasting:add` | Registered pattern by alias / id |
+| `DIR_signature` | `NORTH_EAST_waaw` | Explicit start direction + angle letters |
+| `_signature` | `_waaw` | Angle letters, default direction (EAST) |
+| Signature only | `waaw` | Same as `_waaw` |
+| `mask_<mask>` | `mask_-v--` | HexBug mask |
+| Specials | `{` `}` `(` `)` `\` `intro` `retro` `escape` | Parens / escape |
+
+HexSimulator's "Drawn patterns" mode always emits `DIR_signature` tokens, so a server only needs
+that form plus `num_<n>` and names to be fully usable from the canvas.
+
 ### Commands
 
 | `cmd` | Body fields | Meaning |
@@ -142,6 +160,11 @@ Frontend rendering rules of thumb:
 }
 ```
 
+- `index` is the zero-based index of the **next** iota to execute (equals `total` when done).
+- `executed` (informational) is the zero-based index of the iota the last `step.next` executed.
+- `preview` is present while not done; it may omit `rich`/`children`.
+- `stopped` appears when the session ended early (e.g. `"mishap"`).
+
 ### MieLib HexCLI enablement
 
 Off by default. Enable with e.g.:
@@ -179,9 +202,13 @@ See MieLib `HEXCLI.md` / `docs/hexcli-http.md` for bind address, CORS, and token
 
 字段与英文节表格相同。`cmd` 取值：`ping`、`run`、`reset`、`stack`、`step.begin`、`step.next`、`step.abort`、`complete`，以及可选的 `profile.*` / `env.*`。
 
+`code`（hexParse）支持：`num_<n>`（数字）、图案名（如 `add`、`hexcasting:add`）、`方向_签名`（如 `NORTH_EAST_waaw`）、`_签名` 或仅签名（默认 EAST）、`mask_<遮罩>`，以及 `{ } ( ) \ intro retro escape` 等特殊记号。完整表格见 [`PROTOCOL.zh-CN.md`](./PROTOCOL.zh-CN.md#codehexparse语法) 或上方英文表。
+
 Iota 对象必有 `type` / `text` / `color` / `rich`；数字可有 `value`，图案有 `pattern:{startDir,angles}`，实体有 `entity`，列表有 `children`。
 
 栈顺序：**底 → 顶**。有 `data.cast` 时优先读 `data.cast.stack`，否则读 `data.stack`。
+
+`data.step`：`total`、`index`（**下一个**待执行 iota 的下标，完成后等于 `total`）、`done`，可选 `executed`（最近一次 `step.next` 执行的下标）、`preview`（未完成的下一 iota）、`stopped`（提前结束的原因，如 `"mishap"`）。
 
 ### MieLib 启用
 

@@ -36,7 +36,7 @@ import {
   RpcError,
 } from "../server/client.ts";
 import type { RpcRequest, RpcResponse } from "../server/types.ts";
-import { PROTOCOL_VERSION, toSnapshot } from "../server/types.ts";
+import { mergeStack, PROTOCOL_VERSION, toSnapshot } from "../server/types.ts";
 import type { CastSnapshot } from "../server/types.ts";
 
 type InputMode = "code" | "patterns";
@@ -198,7 +198,8 @@ export default function SimulatorPage() {
   const applyParsedPatterns = useCallback(
     (parsed: LaidOutPattern[]) => {
       commitPatterns(parsed);
-      staffRef.current?.resetView();
+      // Let the canvas lay out before fitting the new staff.
+      requestAnimationFrame(() => staffRef.current?.fitToPatterns());
       setBanner(null);
     },
     [commitPatterns],
@@ -217,12 +218,7 @@ export default function SimulatorPage() {
       setBanner(null);
       try {
         const response = await client.rpc({ ...request, id: Date.now() });
-        setSnapshot(toSnapshot(response));
-        if (response.ok) {
-          setConnection((current) =>
-            current.state === "connected" ? current : current,
-          );
-        }
+        setSnapshot((previous) => mergeStack(previous, toSnapshot(response)));
         return response;
       } catch (error) {
         const message =
@@ -440,9 +436,9 @@ export default function SimulatorPage() {
                 <button
                   type="button"
                   className="icon-btn"
-                  onClick={() => staffRef.current?.resetView()}
-                  title="Reset view"
-                  aria-label="Reset view"
+                  onClick={() => staffRef.current?.fitToPatterns()}
+                  title={t("input.fitView")}
+                  aria-label={t("input.fitView")}
                 >
                   <IconFocus />
                 </button>
@@ -471,13 +467,6 @@ export default function SimulatorPage() {
             </div>
             <p className="field__help">{t("input.drawHint")}</p>
           </section>
-
-          <HexParsePanel
-            code={code}
-            onCodeChange={setCode}
-            onApplyPatterns={applyParsedPatterns}
-            disabled={busy}
-          />
 
           <div className="run-bar">
             <div className="segmented" role="group" aria-label={t("input.modeLabel")}>
@@ -537,6 +526,13 @@ export default function SimulatorPage() {
             onBegin={() => void stepBegin()}
             onNext={() => void stepNext()}
             onAbort={() => void stepAbort()}
+          />
+
+          <HexParsePanel
+            code={code}
+            onCodeChange={setCode}
+            onApplyPatterns={applyParsedPatterns}
+            disabled={busy}
           />
         </div>
 

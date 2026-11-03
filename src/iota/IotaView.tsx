@@ -100,7 +100,7 @@ function NumberIota({ iota }: { iota: Iota }) {
   return (
     <span className={`iota-chip iota-chip--number${isInteger ? "" : " iota-chip--decimal"}`}>
       <span className="iota-chip__sigil" aria-hidden="true">
-        {Number.isFinite(value) && value < 0 ? "−" : "±"}
+        #
       </span>
       <span className="iota-chip__value">{display}</span>
     </span>

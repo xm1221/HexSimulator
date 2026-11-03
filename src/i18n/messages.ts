@@ -71,6 +71,7 @@ const en = {
   "input.helpBody":
     "Separate tokens with spaces. `num_3` draws the literal 3, `mask_-v--` draws a HexBug mask, `NORTH_EAST_waaw` uses an explicit direction, `_waaw` defaults to EAST, and named patterns like `add` or `hexcasting:add` come from patterns.json.",
   "input.drawHint": "Drag on the canvas to draw. Click a stroke to edit it.",
+  "input.fitView": "Fit staff to view",
   "input.staffEmpty": "Draw a pattern, or parse hexParse source.",
 
   "cast.run": "Run",
@@ -222,6 +223,7 @@ const zh: Record<MessageKey, string> = {
   "input.helpBody":
     "用空格分隔 token。`num_3` 画出数字 3，`mask_-v--` 画 HexBug 遮罩，`NORTH_EAST_waaw` 指定起点方向，`_waaw` 默认朝东，`add` / `hexcasting:add` 等名称来自 patterns.json。",
   "input.drawHint": "在画布上拖动即可绘制；点击已有笔画可编辑。",
+  "input.fitView": "缩放至全部图案",
   "input.staffEmpty": "画一个图案，或解析 hexParse 源码。",
 
   "cast.run": "运行",

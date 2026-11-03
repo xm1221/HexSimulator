@@ -32,6 +32,8 @@ import type { LaidOutPattern } from "../hexparse/index.ts";
 
 export interface StaffGridRef {
   resetView: () => void;
+  /** Center and scale the view so every pattern is visible. */
+  fitToPatterns: () => void;
   cancelPattern: () => void;
   panToPattern: (pattern: LaidOutPattern) => void;
 }
@@ -329,7 +331,7 @@ export function StaffGrid({
       ctx.clearRect(0, 0, width, height);
 
       drawBackdrop(ctx, width, height);
-      drawGridDots(ctx, time);
+      drawGridDots(ctx, time, hexToScreen, screenToHex, width, height);
 
       const editingIndex =
         drawRef.current.type === "drawing"
@@ -396,6 +398,40 @@ export function StaffGrid({
     () => ({
       resetView: () => {
         viewRef.current = { panX: 0, panY: 0, zoom: 1 };
+      },
+      fitToPatterns: () => {
+        const entries = patternsRef.current;
+        if (entries.length === 0) {
+          viewRef.current = { panX: 0, panY: 0, zoom: 1 };
+          return;
+        }
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const entry of entries) {
+          for (const coord of entry.pattern.positions(entry.origin)) {
+            const point = coordToPx(coord, HEX_SIZE);
+            minX = Math.min(minX, point.x);
+            maxX = Math.max(maxX, point.x);
+            minY = Math.min(minY, point.y);
+            maxY = Math.max(maxY, point.y);
+          }
+        }
+        const canvas = canvasRef.current;
+        const width = canvas?.clientWidth ?? 0;
+        const height = canvas?.clientHeight ?? 0;
+        const padding = HEX_SIZE * 2.2;
+        const spanX = Math.max(maxX - minX + padding * 2, 1);
+        const spanY = Math.max(maxY - minY + padding * 2, 1);
+        const zoom = clamp(
+          Math.min(width / spanX, height / spanY),
+          MIN_ZOOM,
+          MAX_ZOOM,
+        );
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        viewRef.current = { panX: -midX * zoom, panY: -midY * zoom, zoom };
       },
       cancelPattern: () => {
         drawRef.current = IDLE;
@@ -567,19 +603,46 @@ function drawBackdrop(
   ctx.fillRect(0, 0, width, height);
 }
 
-function drawGridDots(ctx: CanvasRenderingContext2D, time: number) {
-  // Dots are drawn lazily only where patterns are not; cheap because the grid
-  // is sparse. Instead of iterating the whole plane, we draw a soft vignette
-  // plus a faint dot ring around the view center.
+function drawGridDots(
+  ctx: CanvasRenderingContext2D,
+  time: number,
+  hexToScreen: (coord: HexCoord) => Point,
+  screenToHex: (point: Point) => HexCoord,
+  width: number,
+  height: number,
+) {
+  // Draw the hex lattice itself, so the dots pan and zoom with the staff.
+  const corners = [
+    screenToHex({ x: 0, y: 0 }),
+    screenToHex({ x: width, y: 0 }),
+    screenToHex({ x: 0, y: height }),
+    screenToHex({ x: width, y: height }),
+  ];
+  const minQ = Math.min(...corners.map((corner) => corner.q)) - 1;
+  const maxQ = Math.max(...corners.map((corner) => corner.q)) + 1;
+  const minR = Math.min(...corners.map((corner) => corner.r)) - 1;
+  const maxR = Math.max(...corners.map((corner) => corner.r)) + 1;
+  if ((maxQ - minQ) * (maxR - minR) > 6000) {
+    return;
+  }
+
   ctx.save();
-  ctx.globalAlpha = 0.12 + 0.02 * Math.sin(time * 0.7);
+  ctx.globalAlpha = 0.16 + 0.03 * Math.sin(time * 0.7);
   ctx.fillStyle = "rgba(200, 190, 255, 1)";
-  const step = 28;
-  const cols = Math.ceil((ctx.canvas.clientWidth || 0) / step);
-  const rows = Math.ceil((ctx.canvas.clientHeight || 0) / step);
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      ctx.fillRect(col * step + 14, row * step + 14, 1, 1);
+  for (let r = minR; r <= maxR; r++) {
+    for (let q = minQ; q <= maxQ; q++) {
+      const point = hexToScreen({ q, r });
+      if (
+        point.x < -8
+        || point.x > width + 8
+        || point.y < -8
+        || point.y > height + 8
+      ) {
+        continue;
+      }
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 1.1, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   ctx.restore();
