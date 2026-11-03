@@ -1,47 +1,57 @@
-name: Build and deploy to Cloudflare Pages
+name: Deploy to Cloudflare Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      # https://github.com/actions/setup-node/issues/904#issuecomment-2670963061
-      - run: corepack enable
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --immutable
-
-      - name: Build app
-        run: yarn build
-
-      - name: Check Cloudflare credentials
-        id: credentials
+      - name: Check for Cloudflare credentials
+        id: creds
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
+          if [ -n "$TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping Cloudflare Pages deploy."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy — set CLOUDFLARE_API_TOKEN secret to enable it."
           fi
 
-      - name: Deploy to Cloudflare Pages
-        if: steps.credentials.outputs.available == 'true'
-        uses: cloudflare/wrangler-action@v3
+      - if: steps.creds.outputs.present == 'true'
+        name: Enable corepack
+        run: corepack enable
+
+      - if: steps.creds.outputs.present == 'true'
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ab2343f4691dfe98689e375fc23d4121
-          command: pages deploy dist --project-name=hextools --branch=main
+          node-version: 22
+          cache: yarn
+
+      - if: steps.creds.outputs.present == 'true'
+        name: Install
+        run: yarn install --immutable
+
+      - if: steps.creds.outputs.present == 'true'
+        name: Build
+        run: yarn build
+
+      - if: steps.creds.outputs.present == 'true'
+        name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ab2343f4691dfe98689e375fc23d4121
+        run: npx --yes wrangler@4.157.0 pages deploy dist --project-name=hexsimulator --branch=main
