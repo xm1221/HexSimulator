@@ -23,23 +23,23 @@ jobs:
         id: creds
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+          if [ -n "$TOKEN" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping deploy — set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets to enable it."
+            echo "::notice::Skipping deploy — set CLOUDFLARE_API_TOKEN secret to enable it."
           fi
+
+      - if: steps.creds.outputs.present == 'true'
+        name: Enable corepack
+        run: corepack enable
 
       - if: steps.creds.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - if: steps.creds.outputs.present == 'true'
-        name: Enable corepack
-        run: corepack enable
+          cache: yarn
 
       - if: steps.creds.outputs.present == 'true'
         name: Install
@@ -54,5 +54,9 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Same account as HexTools; public account id (not a secret).
+          accountId: ab2343f4691dfe98689e375fc23d4121
+          # Pin wrangler 4 — action's default 3.x hits Pages API routing errors on this account.
+          wranglerVersion: "4.157.0"
+          packageManager: npm
           command: pages deploy dist --project-name=hexsimulator --branch=main
