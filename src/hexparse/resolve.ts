@@ -1,21 +1,11 @@
-/**
- * hexParse token resolver.
- *
- * Ported from HexTools (`src/hexparse/resolve.ts`), MIT License,
- * Copyright (c) 2026 [object Object]. See THIRD_PARTY.md.
- *
- * Accepts `num_<n>`, `mask_<mask>`, `<dir>_<sig>`, `_<sig>`, special tokens
- * (`{` `}` `(` `)` `\` `escape` `intro` `retro`), and named patterns such as
- * `add` or `hexcasting:add`.
- */
+import { HexDir, HexPattern } from "@hextools/renderer/staffGrid";
 
-import { HexDir, HexPattern } from "../canvas/hex.ts";
 import { maskToPattern } from "./mask.ts";
 import {
   directionFromName,
   lookupNumber,
-  NEGATIVE_NUMBER_PREFIX,
   NUMBER_PREFIX,
+  NEGATIVE_NUMBER_PREFIX,
 } from "./numbers.ts";
 import type {
   ParsedToken,
@@ -84,7 +74,7 @@ function parseSignatureToken(
   if (candidates.length >= 2) {
     const direction = directionFromName(candidates.slice(0, -1).join("_"));
     const signature = candidates[candidates.length - 1];
-    if (direction != null && /^[wqeasd]*$/.test(signature)) {
+    if (direction != null && /^[wqeasd]+$/.test(signature)) {
       return {
         pattern: HexPattern.fromSignature(direction, signature),
         direction,
@@ -92,7 +82,7 @@ function parseSignatureToken(
     }
   }
   const signature = token.startsWith("_") ? token.slice(1) : token;
-  if (signature.length > 0 && /^[wqeasd]+$/.test(signature)) {
+  if (/^[wqeasd]+$/.test(signature)) {
     return {
       pattern: HexPattern.fromSignature(DEFAULT_DIRECTION, signature),
       direction: DEFAULT_DIRECTION,
@@ -130,7 +120,7 @@ function resolveToken(
   if (raw.startsWith("num_") || raw.startsWith("number_")) {
     const literal = raw.slice(raw.indexOf("_") + 1);
     const n = Number(literal);
-    if (!Number.isFinite(n) || literal.trim() === "") {
+    if (!Number.isFinite(n)) {
       return {
         ...base,
         kind: "number",
@@ -191,17 +181,15 @@ function resolveToken(
   }
 
   // Signature with an explicit direction, e.g. `NORTH_EAST_waaw`.
-  if (raw.startsWith("_") || raw.includes("_")) {
-    const signature = parseSignatureToken(raw);
-    if (signature != null) {
-      return {
-        ...base,
-        kind: "special",
-        pattern: signature.pattern,
-        startDir: signature.direction,
-        name: raw,
-      };
-    }
+  const signature = parseSignatureToken(raw);
+  if (signature != null && (raw.startsWith("_") || raw.includes("_"))) {
+    return {
+      ...base,
+      kind: "special",
+      pattern: signature.pattern,
+      startDir: signature.direction,
+      name: raw,
+    };
   }
 
   // Named pattern, qualified (`hexcasting:add`) or bare (`add`).

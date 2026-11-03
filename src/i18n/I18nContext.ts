@@ -1,6 +1,6 @@
-import { createContext, useContext } from "react";
+import { createContext, use } from "react";
 
-import type { Language, MessageKey, MessageVars } from "./messages.ts";
+import type { Language, MessageKey, MessageVars } from "./messages";
 
 export interface I18nContextValue {
   lang: Language;
@@ -14,7 +14,7 @@ export interface I18nContextValue {
 export const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function useI18n(): I18nContextValue {
-  const value = useContext(I18nContext);
+  const value = use(I18nContext);
   if (value == null) {
     throw new Error("useI18n must be used within an I18nProvider");
   }

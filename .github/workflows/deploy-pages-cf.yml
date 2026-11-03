@@ -1,0 +1,47 @@
+name: Build and deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # https://github.com/actions/setup-node/issues/904#issuecomment-2670963061
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build app
+        run: yarn build
+
+      - name: Check Cloudflare credentials
+        id: credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping Cloudflare Pages deploy."
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.credentials.outputs.available == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ab2343f4691dfe98689e375fc23d4121
+          command: pages deploy dist --project-name=hextools --branch=main

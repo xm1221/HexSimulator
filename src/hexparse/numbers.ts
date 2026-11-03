@@ -1,11 +1,5 @@
-/**
- * Number literal encoding/decoding for hexParse.
- *
- * Ported from HexTools (`src/hexparse/numbers.ts`), MIT License,
- * Copyright (c) 2026 [object Object]. See THIRD_PARTY.md.
- */
+import { HexDir, HexPattern } from "@hextools/renderer/staffGrid";
 
-import { HexDir, HexPattern } from "../canvas/hex.ts";
 import type { PatternsData } from "./types.ts";
 
 export const NUMBER_PREFIX = "aqaa";
@@ -22,7 +16,7 @@ export interface NumberLookup {
  *
  * Hexcasting number literals are encoded by the "math pattern" scheme:
  * `w` +1, `q` +5, `e` +10, `a` ×2, `d` ÷2 (the latter two only apply to
- * non-zero values).
+ * non-zero values; they are the doubled/negated forms used while searching).
  */
 export function decodeNumberSignature(signature: string): number | null {
   let value = 0;
@@ -109,7 +103,7 @@ export function lookupNumber(
   const entry = numbers[String(n)];
   if (entry != null) {
     const [startdir, signature] = entry;
-    const startDir = HexDir.fromName(startdir);
+    const startDir = directionFromName(startdir);
     if (startDir != null) {
       return {
         pattern: HexPattern.fromSignature(startDir, signature),
@@ -122,7 +116,16 @@ export function lookupNumber(
   return fallback == null ? null : { pattern: fallback, approximate: true };
 }
 
-/** `directionFromName` kept as an alias for the ported call sites. */
+const DIRECTION_NAMES: Record<string, HexDir> = {
+  NORTH_EAST: HexDir.NORTH_EAST,
+  EAST: HexDir.EAST,
+  SOUTH_EAST: HexDir.SOUTH_EAST,
+  SOUTH_WEST: HexDir.SOUTH_WEST,
+  WEST: HexDir.WEST,
+  NORTH_WEST: HexDir.NORTH_WEST,
+};
+
 export function directionFromName(name: string): HexDir | null {
-  return HexDir.fromName(name);
+  const key = name.trim().toUpperCase().replaceAll("-", "_");
+  return DIRECTION_NAMES[key] ?? null;
 }

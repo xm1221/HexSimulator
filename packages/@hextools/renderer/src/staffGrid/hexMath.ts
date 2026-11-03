@@ -1,0 +1,225 @@
+import type { Vec2, Vec2Like } from "gl-matrix";
+
+import { mod } from "../math";
+import { coordToPx } from "./hexUtils";
+
+export interface HexCoord {
+  q: number;
+  r: number;
+}
+
+export const HexCoord = {
+  shiftedBy(coord: HexCoord, other: HexCoord | HexDir) {
+    let otherCoord = other;
+    if (typeof otherCoord === "number") {
+      otherCoord = HexDir.asDelta(otherCoord);
+    }
+    return { q: coord.q + otherCoord.q, r: coord.r + otherCoord.r };
+  },
+
+  toString(coord: HexCoord) {
+    return `${coord.q},${coord.r}`;
+  },
+
+  *rangeAround(center: HexCoord, radius: number): Generator<HexCoord> {
+    let q = -radius;
+    let r = Math.max(-radius, 0);
+
+    while (r <= radius + Math.min(0, -q) || q < radius) {
+      if (r > radius + Math.min(0, -q)) {
+        q++;
+        r = -radius + Math.max(0, -q);
+      }
+      const out = { q: center.q + q, r: center.r + r };
+      r++;
+      yield out;
+    }
+  },
+
+  // https://www.redblobgames.com/grids/hexagons/#conversions-offset (odd-r)
+  axialToOffset(coord: HexCoord): HexCoord {
+    const parity = coord.r & 1;
+    return {
+      q: coord.q + (coord.r - parity) / 2,
+      r: coord.r,
+    };
+  },
+
+  offsetToAxial(coord: HexCoord): HexCoord {
+    const parity = coord.r & 1;
+    return {
+      q: coord.q - (coord.r - parity) / 2,
+      r: coord.r,
+    };
+  },
+
+  equals(coord: HexCoord, other: HexCoord) {
+    return coord.q === other.q && coord.r === other.r;
+  },
+};
+
+export enum HexDir {
+  NORTH_EAST,
+  EAST,
+  SOUTH_EAST,
+  SOUTH_WEST,
+  WEST,
+  NORTH_WEST,
+}
+
+export namespace HexDir {
+  export function asDelta(dir: HexDir) {
+    return dirToDelta[dir];
+  }
+
+  export function rotatedBy(dir: HexDir, angle: HexAngle): HexDir {
+    return mod(dir + angle, 6);
+  }
+
+  export function angleFrom(dir: HexDir, other: HexDir): HexAngle {
+    return mod(dir - other, 6);
+  }
+
+  export function toShorthand(dir: HexDir): string {
+    return dirToShorthand[dir];
+  }
+}
+
+const dirToDelta: Record<HexDir, HexCoord> = {
+  [HexDir.NORTH_EAST]: { q: 1, r: -1 },
+  [HexDir.EAST]: { q: 1, r: 0 },
+  [HexDir.SOUTH_EAST]: { q: 0, r: 1 },
+  [HexDir.SOUTH_WEST]: { q: -1, r: 1 },
+  [HexDir.WEST]: { q: -1, r: 0 },
+  [HexDir.NORTH_WEST]: { q: 0, r: -1 },
+};
+
+const dirToShorthand: Record<HexDir, string> = {
+  [HexDir.NORTH_EAST]: "ne",
+  [HexDir.EAST]: "e",
+  [HexDir.SOUTH_EAST]: "se",
+  [HexDir.SOUTH_WEST]: "sw",
+  [HexDir.WEST]: "w",
+  [HexDir.NORTH_WEST]: "nw",
+};
+
+export enum HexAngle {
+  FORWARD,
+  RIGHT,
+  RIGHT_BACK,
+  BACK,
+  LEFT_BACK,
+  LEFT,
+}
+
+const letterToAngle: Record<string, HexAngle> = {
+  w: HexAngle.FORWARD,
+  e: HexAngle.RIGHT,
+  d: HexAngle.RIGHT_BACK,
+  s: HexAngle.BACK,
+  a: HexAngle.LEFT_BACK,
+  q: HexAngle.LEFT,
+};
+
+const angleToLetter: Record<HexAngle, string> = {
+  [HexAngle.FORWARD]: "w",
+  [HexAngle.RIGHT]: "e",
+  [HexAngle.RIGHT_BACK]: "d",
+  [HexAngle.BACK]: "s",
+  [HexAngle.LEFT_BACK]: "a",
+  [HexAngle.LEFT]: "q",
+};
+
+export class HexPattern {
+  public readonly signature: string;
+
+  constructor(
+    public readonly startDir: HexDir,
+    public readonly angles: readonly HexAngle[] = [],
+  ) {
+    this.signature = this.angles.map((angle) => angleToLetter[angle]).join("");
+  }
+
+  static fromSignature(startDir: HexDir, signature: string): HexPattern {
+    return new HexPattern(
+      startDir,
+      Array.from(signature).map((letter) => letterToAngle[letter]),
+    );
+  }
+
+  tryAppendDir(newDir: HexDir): HexPattern | null {
+    const linesSeen = new Set<string>();
+
+    let cursor = { q: 0, r: 0 };
+    let compass = this.startDir;
+    for (const a of this.angles) {
+      linesSeen.add(`${HexCoord.toString(cursor)},${compass}`);
+      cursor = HexCoord.shiftedBy(cursor, compass);
+      const back = HexDir.rotatedBy(compass, HexAngle.BACK);
+      linesSeen.add(`${HexCoord.toString(cursor)},${back}`);
+      compass = HexDir.rotatedBy(compass, a);
+    }
+    cursor = HexCoord.shiftedBy(cursor, compass);
+
+    if (linesSeen.has(`${HexCoord.toString(cursor)},${newDir}`)) {
+      return null;
+    }
+    const nextAngle = HexDir.angleFrom(newDir, compass);
+    if (nextAngle === HexAngle.BACK) {
+      return null;
+    }
+
+    return this.withAngles([...this.angles, nextAngle]);
+  }
+
+  finalDir(): HexDir {
+    return this.angles.reduce(HexDir.rotatedBy, this.startDir);
+  }
+
+  midpoint(start: HexCoord = { q: 0, r: 0 }): HexCoord {
+    let minQ = start.q;
+    let maxQ = start.q;
+    let minR = start.r;
+    let maxR = start.r;
+    for (const { q, r } of this.positions(start)) {
+      minQ = Math.min(minQ, q);
+      maxQ = Math.max(maxQ, q);
+      minR = Math.min(minR, r);
+      maxR = Math.max(maxR, r);
+    }
+    return {
+      q: (minQ + maxQ) / 2,
+      r: (minR + maxR) / 2,
+    };
+  }
+
+  *positions(start: HexCoord = { q: 0, r: 0 }): Generator<HexCoord> {
+    let cursor = start;
+    let compass = this.startDir;
+    yield cursor;
+    for (const a of this.angles) {
+      cursor = HexCoord.shiftedBy(cursor, compass);
+      yield cursor;
+      compass = HexDir.rotatedBy(compass, a);
+    }
+    yield HexCoord.shiftedBy(cursor, compass);
+  }
+
+  *toLines(size: number, offset: Vec2Like): Generator<Vec2> {
+    for (const coord of this.positions()) {
+      yield coordToPx({ coord, size, offset });
+    }
+  }
+
+  toString(): string {
+    return `${HexDir[this.startDir]} ${this.signature}`;
+  }
+
+  toShorthand(): string {
+    return `${HexDir.toShorthand(this.startDir)} ${this.signature}`;
+  }
+
+  withAngles(newAngles: readonly HexAngle[]): HexPattern {
+    return new HexPattern(this.startDir, newAngles);
+  }
+}

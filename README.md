@@ -1,146 +1,164 @@
-# HexSimulator
+# Hex Tools
 
-**A graphical, vendor-neutral web frontend for HexCLI-compatible Hex Casting servers.**
+Web tools for Hex Casting.
 
-[中文说明](./README.zh-CN.md) · [Protocol](./docs/PROTOCOL.md) · [Architecture](./docs/ARCHITECTURE.md) · [Third-party notices](./THIRD_PARTY.md)
+This is a fork of [object-Object/HexTools](https://github.com/object-Object/HexTools),
+maintained at [xm1221/HexTools](https://github.com/xm1221/HexTools). It adds a
+text-to-pattern input ("HexParse") to the staff grid page.
 
-HexSimulator is a static single-page app. You draw patterns on a staff grid or type
-[hexParse](https://github.com/FallingColors/HexBug) source, point the app at any server that
-implements the small HTTP JSON protocol in [`docs/PROTOCOL.md`](./docs/PROTOCOL.md), and it casts
-the code and renders the resulting stack, ravenmind, mishaps, prints and step state.
+## HexParse
 
-It contains **no Minecraft code and no server**: it is only a client. The protocol is deliberately
-small, so MieLib's HexCLI is one implementation, not a requirement.
+Open the Staff Grid page and press the keyboard button in the top-left corner.
+Type whitespace-separated tokens and hit **Parse and draw**.
 
-## Features
-
-- **Staff grid canvas** — draw patterns with mouse or touch (undo/redo, click a stroke to edit it,
-  pinch-zoom, pan, fit-to-view). Adapted from HexTools' Staff Grid.
-- **hexParse input** — `num_1 num_2 add`, `mask_-v--`, `NORTH_EAST_waaw`, `_waaw`, named patterns
-  (`add`, `hexcasting:add`) and the `{ } ( ) \` specials, backed by a bundled
-  `patterns.json` (1384 patterns, 4001 number literals).
-- **Rich stack rendering** — numbers, vectors, booleans, null, garbage, entities, collapsible lists,
-  and **mini glyphs** for pattern iotas (falls back to parsing the iota text when a server omits
-  `pattern`).
-- **Run / Refresh / Reset** — plus a **step debugger** (Begin / Next / Abort with preview and
-  progress) when the server supports `step.*`.
-- **Result panel** — resolution, ops/steps, media used/dust, mishap list, prints, messages, parser
-  messages and the raw server log.
-- **Bilingual UI** — English and 中文, following the browser language by default; the choice is
-  remembered. Docs are bilingual too.
-- **Friendly connection handling** — `GET /v1/health` status pill, precise errors for CORS,
-  mixed content, timeouts, bad JSON and HTTP status, token stored in `localStorage`.
-
-## Quick start
-
-```bash
-yarn install
-yarn dev        # http://localhost:5173
-yarn build      # static output in dist/
-yarn preview    # serve dist/
-```
-
-Open the app, click the ⚙ settings button, and enter your server's **Base URL** (for example
-`http://127.0.0.1:8742`). Optionally add a token; it is sent as `Authorization: Bearer <token>`.
-Both values are stored in this browser's `localStorage`.
-
-Then either:
-
-1. leave the default `num_1 num_2 add` in the hexParse box and press **Run** (sends it as `code`), or
-2. press **Parse into staff** to draw it, edit it on the canvas, switch the toggle to
-   **Drawn patterns**, and press **Run**.
-
-### No server handy?
-
-A mock server is included:
-
-```bash
-node scripts/mock-server.mjs --port 8742
-# or, with auth:
-node scripts/mock-server.mjs --port 8742 --token s3cret
-```
-
-It understands `num_<n>`, `add`, `subtract`, `multiply`, `true`/`false` and echoes other tokens as
-pattern iotas, and implements `ping`, `run`, `stack`, `reset`, `step.begin`, `step.next`,
-`step.abort`. Point the app at `http://127.0.0.1:8742`.
-
-### Tests
-
-```bash
-yarn smoke
-```
-
-`scripts/smoke-rpc.mjs` bundles the real client, types and hexParse modules with esbuild, starts the
-mock server on an ephemeral port, and checks URL normalization, auth, health, `num_1 num_2 add` → top
-of stack 3, mishaps, `stack`/`reset`, the whole step sequence, unknown commands, snapshot
-fallbacks, hexParse parsing/layout/round-tripping and network-error classification (51 checks).
-
-## Connecting a server
-
-The client only uses two endpoints:
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/v1/health` | Liveness + protocol version, no auth required |
-| `POST` | `/v1/rpc` | Commands: `ping`, `run`, `stack`, `reset`, `step.begin`, `step.next`, `step.abort`, … |
-
-The Base URL may be a bare origin (`http://127.0.0.1:8742`), include a path prefix
-(`https://example.com/hex`) or already end in `/v1`; all three normalize to the same endpoints.
-
-### Mixed content (important)
-
-Browsers block `http://` requests made from an `https://` page. So:
-
-- the deployed HTTPS app **cannot** talk to `http://localhost:8742`;
-- run the app over plain HTTP for local development (`yarn dev` serves `http://localhost:5173`), or
-- put TLS in front of the server, or reverse-proxy the API on the same origin as the app.
-
-The settings drawer warns you when the combination cannot work.
-
-For the server side, the protocol document covers token auth, CORS allow-listing and the MieLib
-HexCLI system properties (`-Dmielib.hexcli=true -Dmielib.hexcli.http=true
--Dmielib.hexcli.http.port=8742`).
-
-## Deploying
-
-`yarn build` emits a fully static `dist/` with relative asset paths (`base: "./"`), so it can be
-served from any static host or sub-path. The app is also deployed to Cloudflare Pages:
-**https://hexsimulator.pages.dev** (see `.github/workflows/deploy-pages.yml`).
-
-## Project layout
+Try:
 
 ```
-src/
-  canvas/       staff grid canvas + hex geometry (port of HexTools' staff grid)
-  hexparse/     hexParse tokenizer, masks, number literals (port of HexTools' hexparse)
-  iota/         IotaView, StackView, ResultPanel, PatternGlyph
-  server/       protocol types + fetch client
-  components/   settings drawer, hexParse editor, step bar, icons
-  i18n/         English/Chinese messages
-  pages/        SimulatorPage
-public/data/patterns.json
-docs/           protocol + architecture (bilingual)
-scripts/        mock server + protocol smoke test
+num_1 num_2 add
 ```
 
-See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the component diagram, data flow, and how
-to plug in a *different* server implementation.
+Supported token syntax:
+
+| Token                                        | Meaning                                                  | Example              |
+| -------------------------------------------- | -------------------------------------------------------- | -------------------- |
+| `num_<n>`                                    | number literal, looked up in `public/data/patterns.json` | `num_123`, `num_-42` |
+| `mask_<mask>`                                | HexBug mask made of `-` and `v`                          | `mask_---v-v`        |
+| `<sig>` / `_<sig>`                           | angle letters, starting EAST by default                  | `waaw`, `_qqq`       |
+| `<DIR>_<sig>`                                | angle letters with an explicit direction                 | `NORTH_EAST_waaw`    |
+| `add`, `hexcasting:add`                      | any alias from the generated pattern list                | `break_block`        |
+| `{` `}` `(` `)` `\` `escape` `intro` `retro` | Hex Casting special patterns                             | `{ num_1 }`          |
+
+Tokens that cannot be resolved are reported as errors and skipped; the rest of
+the input is still drawn. Numbers outside the pregenerated ±2000 table fall
+back to a greedy encoding and are shown with a warning.
+
+The parser lives in [`src/hexparse/`](src/hexparse) and has a smoke test:
+
+```sh
+yarn verify-hexparse
+```
+
+## Refreshing the pattern data
+
+`public/data/patterns.json` is generated from
+[hexdoc](https://github.com/object-Object/hexdoc) pattern files published by each
+Hex Casting mod, plus a pregenerated table of number literals.
+
+```sh
+# optional: put hexdoc + the mods into a throwaway directory
+uv pip install --target .vendor-hexdoc -r scripts/requirements.txt
+
+yarn generate-patterns   # python3 scripts/generate_patterns.py
+```
+
+The script scans `**/*.patterns.hexdoc.json` under `.vendor-hexdoc` (override
+with `HEXDOC_VENDOR_DIR`), merges them, and combines the result with
+`scripts/data/numbers_2000.json`. Mods that fail to install are recorded under
+`gaps` in the output instead of aborting. `SKIP_INSTALL=1` reuses an existing
+`.vendor-hexdoc` directory.
+
+The generated JSON is committed, so CI and ordinary builds never need Python.
+
+## Build and deploy
+
+```sh
+corepack yarn install
+corepack yarn build
+```
+
+Deployment target is Cloudflare Pages (project `hextools`, custom domain
+`hextools.xm1221.cn`). Manual deploy:
+
+```sh
+npx wrangler@4 pages deploy dist --project-name=hextools --branch=main
+```
+
+`.github/workflows/deploy-pages-cf.yml` does this automatically on pushes to
+`main` when a `CLOUDFLARE_API_TOKEN` repository secret exists; without the
+secret the job still succeeds and only builds. The upstream GitHub Pages
+workflow is kept for the original repository.
 
 ## Credits
 
-HexSimulator would not exist without these MIT-licensed projects:
+- [object-Object/HexTools](https://github.com/object-Object/HexTools) — upstream project
+- [hexdoc](https://github.com/object-Object/hexdoc) — pattern metadata and the `.patterns.hexdoc.json` format
+- [HexBug](https://github.com/object-Object/HexBug) — mask syntax, number literal encoding, special pattern semantics
+- [hexparse](https://github.com/object-Object/hexparse) — the text-to-pattern idea
 
-- **[HexTools](https://github.com/xm1221/HexTools)** — Copyright (c) 2026 [object Object]. The staff
-  grid interaction model, hex geometry, hexParse tokenizer, number/mask parsing and
-  `public/data/patterns.json` are ported/adapted. The license notice is reproduced in
-  [`THIRD_PARTY.md`](./THIRD_PARTY.md).
-- **[hexdoc](https://github.com/object-Object/hexdoc)** — the pattern registry data in
-  `patterns.json` was generated from hexdoc's Hex Casting exports (MIT).
-- **[HexBug](https://github.com/FallingColors/HexBug)** — the hexParse input syntax this project
-  accepts.
-- **[Hex Casting](https://github.com/FallingColors/HexMod)** by petrak — the game mod whose pattern
-  shapes and rendering behaviour everything here imitates.
-- **MieLib HexCLI** — the reference server implementation of the HTTP protocol, and the source of
-  the iota JSON shape used by `docs/PROTOCOL.md`.
+Licensed under the MIT license, see [LICENSE](LICENSE).
 
-This project itself is [MIT licensed](./LICENSE).
+---
+
+# Hex Tools（中文）
+
+本项目是 [object-Object/HexTools](https://github.com/object-Object/HexTools) 的 fork，
+仓库位于 [xm1221/HexTools](https://github.com/xm1221/HexTools)，
+在线地址 <https://hextools.xm1221.cn>。
+在原版 Staff Grid 页面上新增了「文本转图案」输入框（左上角键盘按钮）。
+
+## 用法
+
+在 Staff Grid 页面点击左上角的键盘图标，输入以空格分隔的图案标记，然后点
+**Parse and draw**（解析并绘制）。例如：
+
+```
+num_1 num_2 add
+```
+
+支持的写法：
+
+- `num_<整数>`：数字字面量，例如 `num_123`、`num_-42`
+- `mask_<掩码>`：HexBug 的掩码语法，只能包含 `-` 和 `v`，例如 `mask_---v-v`
+- `waaw`、`_qqq`：角度字母，默认从 EAST 开始
+- `NORTH_EAST_waaw`：显式指定起始方向
+- `add`、`hexcasting:add`：任何已收录的图案别名
+- `{` `}` `(` `)` `\` `escape` `intro` `retro`：Hex Casting 的特殊图案
+
+无法识别的标记会以错误提示列出并被跳过，其余标记照常绘制。超出预生成
+±2000 范围的数字会退化为贪心编码，并给出警告。
+
+## 刷新图案数据
+
+`public/data/patterns.json` 由各 Hex Casting 模组发布的
+[hexdoc](https://github.com/object-Object/hexdoc) 图案文件，加上预生成的数字表合并而成：
+
+```sh
+uv pip install --target .vendor-hexdoc -r scripts/requirements.txt
+yarn generate-patterns
+```
+
+脚本会扫描 `.vendor-hexdoc` 下的 `**/*.patterns.hexdoc.json`（可用
+`HEXDOC_VENDOR_DIR` 覆盖目录），与 `scripts/data/numbers_2000.json` 合并后写出
+`public/data/patterns.json`。安装失败的模组会记录在输出的 `gaps` 字段中，
+不会中断流程；已有 `.vendor-hexdoc` 时可设置 `SKIP_INSTALL=1` 跳过安装。
+
+生成的 JSON 已提交到仓库，因此普通构建和 CI 都不需要 Python。
+
+自检脚本：
+
+```sh
+yarn verify-hexparse
+```
+
+## 构建与部署
+
+```sh
+corepack yarn install
+corepack yarn build
+```
+
+部署到 Cloudflare Pages（项目名 `hextools`，自定义域名 `hextools.xm1221.cn`）。
+手动部署：
+
+```sh
+npx wrangler@4 pages deploy dist --project-name=hextools --branch=main
+```
+
+`.github/workflows/deploy-pages-cf.yml` 会在 push 到 `main` 时自动构建并部署；
+如果仓库没有配置 `CLOUDFLARE_API_TOKEN` secret，则只构建、不部署，任务不会失败。
+上游原有的 GitHub Pages workflow 保留不动。
+
+## 致谢与许可
+
+感谢上游 HexTools，以及 hexdoc、HexBug、hexparse 提供的图案数据与语法参考。
+本项目沿用 MIT 许可证，见 [LICENSE](LICENSE)。

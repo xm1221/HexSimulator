@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # https://github.com/actions/setup-node/issues/904#issuecomment-2670963061
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Check Yarn constraints
+        run: yarn constraints
+
+      - name: Build app
+        run: yarn build
+
+      - name: Build packages
+        run: yarn build-packages
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - name: Upload packages artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: packages
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Run linters
+        run: yarn lint

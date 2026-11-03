@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-import { I18nContext } from "./I18nContext.ts";
-import type { I18nContextValue } from "./I18nContext.ts";
-import type { Language, MessageKey, MessageVars } from "./messages.ts";
-import { messages, translateParseMessage } from "./messages.ts";
+import { I18nContext, type I18nContextValue } from "./I18nContext";
+import type { Language, MessageKey, MessageVars } from "./messages";
+import { messages, translateParseMessage } from "./messages";
 
-const STORAGE_KEY = "hexsimulator-lang";
+const STORAGE_KEY = "hextools-lang";
 
 function isLanguage(value: unknown): value is Language {
   return value === "en" || value === "zh";
@@ -73,5 +77,5 @@ export function I18nProvider({ children }: I18nProviderProps) {
     [lang, setLang, t, tParseMessage],
   );
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return <I18nContext value={value}>{children}</I18nContext>;
 }

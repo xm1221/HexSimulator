@@ -1,27 +1,86 @@
 {
   "name": "hexsimulator",
+  "version": "0.0.0",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
-  "description": "A graphical web frontend for HexCLI-compatible servers implementing the HexSimulator HTTP protocol.",
-  "license": "MIT",
+  "workspaces": [
+    "packages/@hextools/*"
+  ],
   "scripts": {
-    "dev": "vite",
     "build": "tsc -b && vite build",
+    "build-packages": "run-p 'build-packages:*'",
+    "build-packages:react": "vite build packages/@hextools/react",
+    "build-packages:renderer": "vite build packages/@hextools/renderer",
+    "build-storybook": "storybook build",
+    "dev": "vite",
+    "generate-patterns": "python3 scripts/generate_patterns.py",
+    "lint": "run-p 'lint:*'",
+    "lint:eslint": "eslint .",
+    "lint:prettier": "prettier . --check",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
+    "storybook": "storybook dev -p 6006",
+    "storybook-webgl": "cross-env ENABLE_WEBGL_INSPECTOR=1 yarn storybook",
+    "verify-hexparse": "yarn build-packages && yarn node scripts/verify-hexparse.mjs",
     "smoke": "node scripts/smoke-rpc.mjs"
   },
+  "resolutions": {
+    "vite": "^8.0.0-beta.13"
+  },
   "dependencies": {
+    "@dnd-kit/dom": "^0.4.0",
+    "@dnd-kit/helpers": "^0.4.0",
+    "@dnd-kit/react": "^0.4.0",
+    "@hextools/react": "workspace:^",
+    "@hextools/renderer": "workspace:^",
+    "@mantine/core": "^9.1.0",
+    "@mantine/hooks": "^9.1.0",
+    "@tabler/icons-react": "^3.36.1",
+    "gl-matrix": "^4.0.0-beta.2",
+    "lodash": "^4.18.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "wouter": "^3.9.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@storybook/addon-themes": "^10.2.8",
+    "@storybook/react-vite": "^10.2.8",
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "esbuild": "^0.28.2",
+    "@yarnpkg/types": "^4.0.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.4.0",
+    "eslint-plugin-react-dom": "^2.2.3",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "eslint-plugin-react-x": "^2.2.3",
+    "eslint-plugin-storybook": "^10.2.8",
+    "globals": "^16.5.0",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.6",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-packagejson": "^3.0.0",
+    "storybook": "^10.2.8",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
-  }
+    "typescript-eslint": "^8.48.0",
+    "vite": "^8.0.0-beta.13"
+  },
+  "dependenciesMeta": {
+    "@trivago/prettier-plugin-sort-imports@5.2.2": {
+      "unplugged": true
+    },
+    "prettier-plugin-packagejson@3.0.0": {
+      "unplugged": true
+    }
+  },
+  "packageManager": "yarn@4.14.1",
+  "description": "HexSimulator \u2014 HexTools-based graphical frontend for any HexCLI-compatible server",
+  "license": "MIT"
 }

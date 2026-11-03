@@ -1,11 +1,4 @@
-/**
- * hexParse tokenizer types.
- *
- * Ported from HexTools (`src/hexparse/types.ts`), MIT License,
- * Copyright (c) 2026 [object Object]. See THIRD_PARTY.md.
- */
-
-import type { HexDir, HexPattern } from "../canvas/hex.ts";
+import type { HexDir, HexPattern } from "@hextools/renderer/staffGrid";
 
 /** One entry of `public/data/patterns.json`. */
 export interface PatternRecord {
@@ -22,6 +15,7 @@ export interface PatternRecord {
 export interface PatternsData {
   version: number;
   generated_from: number;
+  /** Failed package installs, if any. Shape may be string or {package, reason}. */
   gaps?: unknown[];
   packages?: string[];
   empty_packages?: string[];
@@ -50,7 +44,7 @@ export interface ParsedToken {
   pattern: HexPattern | null;
   /** Resolved direction, when known. */
   startDir?: HexDir;
-  /** Human-readable name, when known. */
+  /** Human-readable name for the sidebar, when known. */
   name?: string;
   /** Set when the literal was produced by the greedy fallback encoder. */
   approximate?: boolean;

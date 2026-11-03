@@ -1,0 +1,21 @@
+import {
+  ActionIcon,
+  useMantineColorScheme,
+  type ActionIconProps,
+} from "@mantine/core";
+import { IconMoon, IconSun } from "@tabler/icons-react";
+
+export interface ColorSchemeButtonProps extends Omit<
+  ActionIconProps,
+  "onClick"
+> {}
+
+export function ColorSchemeButton(props: ColorSchemeButtonProps) {
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+
+  return (
+    <ActionIcon {...props} onClick={toggleColorScheme}>
+      {colorScheme === "dark" ? <IconSun /> : <IconMoon />}
+    </ActionIcon>
+  );
+}

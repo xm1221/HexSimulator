@@ -1,11 +1,4 @@
-/**
- * HexBug mask parsing (`-v-v` -> pattern).
- *
- * Ported from HexTools (`src/hexparse/mask.ts`), MIT License,
- * Copyright (c) 2026 [object Object]. See THIRD_PARTY.md.
- */
-
-import { HexDir, HexPattern } from "../canvas/hex.ts";
+import { HexDir, HexPattern } from "@hextools/renderer/staffGrid";
 
 /**
  * Parse a HexBug "mask" (e.g. `-v-v`) into a pattern.

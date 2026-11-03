@@ -1,14 +1,29 @@
 import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
-// The app is fully static: `base: "./"` keeps the build portable under any
-// sub-path (GitHub Pages project sites, Cloudflare Pages previews, ...).
+// https://vite.dev/config/
 export default defineConfig({
-  base: "./",
-  plugins: [react()],
-  build: {
-    target: "es2022",
-    // patterns.json is intentionally large (~460 KB) and lives in public/.
-    chunkSizeWarningLimit: 800,
+  resolve: {
+    alias: {
+      "@hextools/react": resolve(
+        import.meta.dirname,
+        "./packages/@hextools/react/src",
+      ),
+      "@hextools/renderer": resolve(
+        import.meta.dirname,
+        "./packages/@hextools/renderer/src",
+      ),
+    },
   },
+  server: {
+    allowedHosts: true,
+  },
+  plugins: [
+    react({
+      babel: {
+        plugins: [["babel-plugin-react-compiler"]],
+      },
+    }),
+  ],
 });
