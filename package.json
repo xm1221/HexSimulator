@@ -1,0 +1,27 @@
+{
+  "name": "hexsimulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A graphical web frontend for HexCLI-compatible servers implementing the HexSimulator HTTP protocol.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "smoke": "node scripts/smoke-rpc.mjs"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}
