@@ -4,7 +4,9 @@
 
 [中文说明](./README.zh-CN.md) · [Protocol](./docs/PROTOCOL.md) · [Architecture](./docs/ARCHITECTURE.md) · [Third-party](./THIRD_PARTY.md)
 
-HexSimulator is a **static** Vite/React app. It reuses the HexTools staff-grid look and UX (including zh/en i18n and mobile behaviour), adds a **stack** panel (top-right) and a **ravenmind / 渡鸦之思** panel (top-left), and talks to any server that speaks the small HTTP JSON protocol in [`docs/PROTOCOL.md`](./docs/PROTOCOL.md).
+HexSimulator is a **static** Vite/React app. It reuses the HexTools staff-grid look and UX (including zh/en i18n and mobile behaviour), adds a **stack** panel (top-left) and a **ravenmind / 渡鸦之思** panel (top-right), and talks to any server that speaks the small HTTP JSON protocol in [`docs/PROTOCOL.md`](./docs/PROTOCOL.md).
+
+The staff grid always shows the **full dot grid** (`dotsMode: "all"`) on desktop and touch, so the canvas is never empty while idle.
 
 This repository is **frontend only**. Casting happens on the server (e.g. MieLib HexCLI). The HexTools repo and https://hextools.xm1221.cn are **not** modified by this project.
 

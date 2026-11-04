@@ -1,5 +1,5 @@
 import { Alert, Stack } from "@mantine/core";
-import { useHotkeys, useStateHistory } from "@mantine/hooks";
+import { useHotkeys, useMediaQuery, useStateHistory } from "@mantine/hooks";
 import _ from "lodash";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -28,6 +28,7 @@ type SourceMode = "code" | "drawn";
 
 export default function StaffGridPage() {
   const isTouchscreen = useIsTouchscreen();
+  const isNarrow = useMediaQuery("(max-width: 30em)");
   const { t } = useI18n();
   const { status, run, error } = useServer();
 
@@ -69,11 +70,16 @@ export default function StaffGridPage() {
     ...GuiSpellcasting.getDefaultSettings({
       isTouchscreen,
     }),
+    // HexSimulator always shows the full dot grid, on desktop and touch alike
+    // (HexTools defaults desktop to "mouse", which looks empty without hover).
+    dotsMode: "all",
     dynamicResolutionURL: null,
   };
 
+  // Separate key from HexTools so a previously saved dotsMode: "mouse" cannot
+  // keep hiding the dot grid.
   const [settings, setSettings] = useLocalStorageObject<HexToolsGridSettings>({
-    key: "staff-grid-settings",
+    key: "staff-grid-settings-hexsim",
     defaultValue: defaultSettings,
   });
 
@@ -195,16 +201,26 @@ export default function StaffGridPage() {
         />
       )}
 
-      {/* Top-left: ravenmind + hexParse entry. */}
+      {/* Top-left: stack + run controls (primary), with the hexParse entry
+          tucked underneath it. */}
       <Stack
         gap="xs"
         pos="absolute"
-        top={16}
-        left={16}
-        style={{ pointerEvents: "none" }}
+        top={isNarrow ? 8 : 16}
+        left={isNarrow ? 8 : 16}
+        style={{ pointerEvents: "none", zIndex: 4 }}
       >
         <div style={{ pointerEvents: "auto" }}>
-          <RavenmindPanel />
+          <StackPanel
+            compact={isNarrow}
+            code={effectiveCode}
+            sourceIsDrawn={sourceMode === "drawn"}
+            onToggleSource={() =>
+              setSourceMode((mode) => (mode === "drawn" ? "code" : "drawn"))
+            }
+            onRun={onRun}
+            notify={notify}
+          />
         </div>
         <div style={{ pointerEvents: "auto" }}>
           <HexParseInput
@@ -218,24 +234,17 @@ export default function StaffGridPage() {
         </div>
       </Stack>
 
-      {/* Top-right: live stack / run controls. */}
+      {/* Top-right: ravenmind (渡鸦之思). */}
       <div
         style={{
           position: "absolute",
-          top: 16,
-          right: 16,
+          top: isNarrow ? 8 : 16,
+          right: isNarrow ? 8 : 16,
           pointerEvents: "auto",
+          zIndex: 4,
         }}
       >
-        <StackPanel
-          code={effectiveCode}
-          sourceIsDrawn={sourceMode === "drawn"}
-          onToggleSource={() =>
-            setSourceMode((mode) => (mode === "drawn" ? "code" : "drawn"))
-          }
-          onRun={onRun}
-          notify={notify}
-        />
+        <RavenmindPanel compact={isNarrow} />
       </div>
 
       {!connected && error != null && (

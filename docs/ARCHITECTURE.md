@@ -9,8 +9,8 @@ Browser (HexSimulator)                    HexCLI-compatible server
 ┌─────────────────────────────┐           ┌──────────────────────┐
 │ HexTools shell (Mantine)    │  health   │ GET /v1/health       │
 │  StaffGrid + hexParse       │◄─────────►│ POST /v1/rpc         │
-│  Ravenmind (top-left)       │  run/stack│  patterns.list once  │
-│  Stack (top-right)          │  step.*   │  run / stack / reset │
+│  Stack (top-left)           │  run/stack│  patterns.list once  │
+│  Ravenmind (top-right)      │  step.*   │  run / stack / reset │
 │  ServerProvider + cache     │           │  (live MC registry)  │
 └─────────────────────────────┘           └──────────────────────┘
 ```
@@ -18,7 +18,8 @@ Browser (HexSimulator)                    HexCLI-compatible server
 - **UI base:** vendored from [HexTools](https://github.com/object-Object/HexTools) / xm1221 fork (staff grid, renderer packages, i18n). This repo does not patch HexTools upstream.
 - **RPC:** `src/server/*` — commands and results only.
 - **Patterns:** `patterns.list` on connect → `src/hexparse/registry.ts` localStorage cache → in-memory `PatternsData` for hexParse. Sync once per connection; manual resync only.
-- **Overlays:** `RavenmindPanel` / `StackPanel` on `StaffGridPage`.
+- **Overlays:** `StackPanel` (top-left, with the hexParse entry beneath it) / `RavenmindPanel` (top-right) on `StaffGridPage`. On narrow screens (`max-width: 30em`) both cards shrink but keep their corners: stack on the left, ravenmind on the right.
+- **Canvas:** the staff grid fills the AppShell main area and defaults to `dotsMode: "all"` (settings key `staff-grid-settings-hexsim`).
 
 ## Key paths
 

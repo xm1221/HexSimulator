@@ -4,7 +4,9 @@
 
 [English](./README.md) · [协议](./docs/PROTOCOL.zh-CN.md) · [架构](./docs/ARCHITECTURE.zh-CN.md) · [第三方](./THIRD_PARTY.md)
 
-本仓库**只含前端**（Vite/React 静态页）。界面与画布沿用 HexTools（含中英切换与移动端行为），右上角显示**栈**，左上角显示**渡鸦之思**，通过 [`docs/PROTOCOL.md`](./docs/PROTOCOL.md) 里的小型 HTTP JSON 协议与服务端互传指令和结果。
+本仓库**只含前端**（Vite/React 静态页）。界面与画布沿用 HexTools（含中英切换与移动端行为），左上角显示**栈**，右上角显示**渡鸦之思**，通过 [`docs/PROTOCOL.md`](./docs/PROTOCOL.md) 里的小型 HTTP JSON 协议与服务端互传指令和结果。
+
+法杖画布在桌面端与触屏端都始终显示**完整点阵**（`dotsMode: "all"`），空闲时不会出现空画布。
 
 **不会**改动 HexTools 仓库，也不会动 https://hextools.xm1221.cn。
 

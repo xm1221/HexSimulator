@@ -1,5 +1,5 @@
 /**
- * Stack card, pinned top-right over the staff grid.
+ * Stack card, pinned top-left over the staff grid.
  *
  * The protocol sends stacks bottom -> top. The card renders the top of stack
  * first (labelled) because that is what the next operation consumes; the rest
@@ -46,6 +46,8 @@ export interface StackPanelProps {
   onToggleSource: () => void;
   onRun: () => void;
   notify: (message: string, kind?: "ok" | "error") => void;
+  /** Narrow screens: shrink to leave the top-right ravenmind card visible. */
+  compact?: boolean;
 }
 
 export default function StackPanel({
@@ -54,6 +56,7 @@ export default function StackPanel({
   onToggleSource,
   onRun,
   notify,
+  compact = false,
 }: StackPanelProps) {
   const { t } = useI18n();
   const {
@@ -94,7 +97,10 @@ export default function StackPanel({
       style={{
         backgroundColor: "var(--mantine-color-body)",
         opacity: 0.96,
-        width: "min(340px, calc(100vw - 32px))",
+        // Leave room for the top-right ravenmind card on narrow screens.
+        width: compact
+          ? "min(240px, calc(100vw - 164px))"
+          : "min(340px, calc(100vw - 32px))",
       }}
     >
       <Group gap={6} px="sm" py={8} wrap="nowrap">

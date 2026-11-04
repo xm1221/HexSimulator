@@ -18,7 +18,7 @@ export default function StaffGridTimer({
   return (
     <Paper
       pos="absolute"
-      top={16}
+      bottom={16}
       left={16}
       p="sm"
       style={{ pointerEvents: "none" }}
