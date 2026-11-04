@@ -27,7 +27,8 @@ export type RpcCommand =
   | "profile.show"
   | "profile.use"
   | "env.list"
-  | "env.use";
+  | "env.use"
+  | "patterns.list";
 
 export interface RpcRequest {
   id?: number | string;
@@ -203,4 +204,41 @@ export function mergeStack(previous: CastSnapshot | null, next: CastSnapshot): C
     return next;
   }
   return { ...next, stack: previous.stack };
+}
+
+// ---- pattern registry (`patterns.list`) -----------------------------------
+
+export type PatternDirection =
+  | "NORTH_EAST"
+  | "EAST"
+  | "SOUTH_EAST"
+  | "SOUTH_WEST"
+  | "WEST"
+  | "NORTH_WEST";
+
+/** One registered pattern as sent by the server. */
+export interface PatternListEntry {
+  /** Fully qualified id, e.g. `hexcasting:add`. */
+  id: string;
+  /** Start direction name, e.g. `NORTH_EAST`. */
+  startDir: PatternDirection | string;
+  /** Angle letters (`wqeasd`), e.g. `waaw`. */
+  angles: string;
+  /** Optional extra lookup names (server-specific). */
+  aliases?: string[];
+  /** Optional owning addon / mod id (`hexcasting`, `miehex`, ...). */
+  addon?: string;
+}
+
+/**
+ * Payload of `patterns.list`, as accepted from either `data` or a top-level
+ * `patterns` field for servers that reply in the shorthand shape.
+ */
+export interface PatternListPayload {
+  patterns?: PatternListEntry[];
+  /** Optional pre-generated number table (`"<n>" -> [startDir, angles]`). */
+  numbers?: Record<string, [string, string]>;
+  /** Optional server/adapter identification. */
+  source?: string;
+  version?: number;
 }

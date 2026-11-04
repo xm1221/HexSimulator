@@ -54,6 +54,7 @@
     "@yarnpkg/types": "^4.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "cross-env": "^10.1.0",
+    "esbuild": "^0.27.3",
     "eslint": "^10.4.0",
     "eslint-plugin-react-dom": "^2.2.3",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -81,6 +82,6 @@
     }
   },
   "packageManager": "yarn@4.14.1",
-  "description": "HexSimulator \u2014 HexTools-based graphical frontend for any HexCLI-compatible server",
+  "description": "HexSimulator — HexTools-based graphical frontend for any HexCLI-compatible server",
   "license": "MIT"
 }

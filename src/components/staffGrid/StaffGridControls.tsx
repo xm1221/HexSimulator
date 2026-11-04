@@ -54,7 +54,9 @@ export default function StaffGridControls({
 
   return (
     <>
-      <Stack gap="xs" pos="absolute" top={16} right={16}>
+      {/* Bottom-right: canvas tools. The top-right corner belongs to the
+          stack panel, so this column is anchored to the bottom. */}
+      <Stack gap="xs" pos="absolute" bottom={16} right={16}>
         <StaffGridSettings
           settings={settings}
           onSettingsChange={onSettingsChange}

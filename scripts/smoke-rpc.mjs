@@ -5,8 +5,9 @@
  * 1. Starts the mock server from `scripts/mock-server.mjs` on an ephemeral port.
  * 2. Builds the real client + hexParse sources with esbuild (bundled, so it
  *    exercises the code the browser runs, not a copy).
- * 3. Checks health, `run num_1 num_2 add` -> stack top 3, stack/reset, step
- *    commands, history, number parsing from patterns.json, and error paths.
+ * 3. Checks health, `patterns.list` -> registry normalization, `run num_1
+ *    num_2 add` -> stack top 3, ravenmind, stack/reset, step commands, hexParse
+ *    against the server-supplied registry, and error paths.
  *
  *   yarn smoke
  *
@@ -54,13 +55,47 @@ async function bundleEntry(outfile) {
       hexparse: path.join(projectRoot, "src/hexparse/index.ts"),
     },
     outdir: outfile,
+    // `.mjs` so Node treats the temp-dir output as ESM without a package.json.
+    outExtension: { ".js": ".mjs" },
+    // Some transitive CJS deps (bytebuffer via long) call require("buffer");
+    // give ESM output a real require.
+    banner: {
+      js: "import { createRequire as __createRequire } from 'node:module';\nconst require = __createRequire(import.meta.url);",
+    },
     bundle: true,
     format: "esm",
     platform: "node",
     target: "node20",
     logLevel: "silent",
-    // `import.meta.env` is injected by Vite; the smoke test only needs
-    // everything except `loadPatternsData`, so shim it for esbuild.
+    // Mirror vite.config.ts: the workspace packages are consumed as source,
+    // not through their (unbuilt) package entry points.
+    alias: {
+      "@hextools/react": path.join(projectRoot, "packages/@hextools/react/src"),
+      "@hextools/renderer": path.join(
+        projectRoot,
+        "packages/@hextools/renderer/src",
+      ),
+    },
+    // `.fsh`/`.vsh?raw` are Vite imports; only the staff-grid geometry is
+    // needed here, so stub the shader entry point.
+    plugins: [
+      {
+        name: "stub-shaders",
+        setup(build) {
+          build.onResolve({ filter: /(^|\/)shaders(\/index(\.ts)?)?$/ }, (args) => ({
+            path: path.join(args.resolveDir, "shaders-stub.js"),
+            namespace: "stub",
+          }));
+          build.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
+            contents:
+              "export function enablePositionColorShader() {}\n"
+              + "export function loadPositionColorShader() { throw new Error('WebGL is not available in the smoke test'); }\n",
+            loader: "js",
+          }));
+        },
+      },
+    ],
+    // `import.meta.env` is injected by Vite; the smoke test runs in Node.
     define: {
       "import.meta.env.BASE_URL": '"./"',
     },
@@ -79,18 +114,25 @@ async function main() {
   try {
     await bundleEntry(dir);
     const clientModule = await import(
-      pathToFileURL(path.join(dir, "client.js")).href
+      pathToFileURL(path.join(dir, "client.mjs")).href
     );
     const typesModule = await import(
-      pathToFileURL(path.join(dir, "types.js")).href
+      pathToFileURL(path.join(dir, "types.mjs")).href
     );
     const hexparseModule = await import(
-      pathToFileURL(path.join(dir, "hexparse.js")).href
+      pathToFileURL(path.join(dir, "hexparse.mjs")).href
     );
     const { RpcClient, RpcError, normalizeEndpoints } = clientModule;
     const { toSnapshot, mergeStack } = typesModule;
-    const { parseHex, parseToResolvedPatterns, patternsToCode } =
-      hexparseModule;
+    const {
+      parseHex,
+      parseToResolvedPatterns,
+      patternsToCode,
+      patternsDataFromServer,
+      fromPatternsListReply,
+      OFFLINE_PATTERNS_DATA,
+      BUILTIN_NUMBERS,
+    } = hexparseModule;
 
     // ---- normalization ---------------------------------------------------
     console.log("\nURL normalization");
@@ -143,6 +185,56 @@ async function main() {
     check("ping ok", ping.ok === true);
     equal("ping echoes id", ping.id, 7);
 
+    // ---- patterns.list ---------------------------------------------------
+    console.log("\npatterns.list");
+    const listReply = await client.rpc({ cmd: "patterns.list" });
+    check("patterns.list ok", listReply.ok === true);
+    check(
+      "patterns.list returns data.patterns array",
+      Array.isArray(listReply.data?.patterns),
+      JSON.stringify(listReply.data)?.slice(0, 120),
+    );
+    check(
+      "registry includes hexcasting:add",
+      (listReply.data?.patterns ?? []).some((p) => p.id === "hexcasting:add"),
+    );
+    check(
+      "registry includes an addon pattern",
+      (listReply.data?.patterns ?? []).some((p) => p.id.startsWith("miehex:")),
+    );
+
+    const registry = fromPatternsListReply(await client.patternsList(), baseUrl);
+    check("normalized registry has patterns", registry.patterns.length > 0);
+    check(
+      "normalized registry carries the built-in number table",
+      Object.keys(registry.numbers ?? {}).length > 1000,
+      String(Object.keys(registry.numbers ?? {}).length),
+    );
+    const addRecord = registry.patterns.find((p) => p.id === "hexcasting:add");
+    equal("normalized add startdir", addRecord?.startdir, "NORTH_EAST");
+    equal("normalized add signature", addRecord?.signature, "waaw");
+    check(
+      "normalized aliases include the bare name",
+      addRecord?.aliases?.includes("add"),
+      JSON.stringify(addRecord?.aliases),
+    );
+
+    // Top-level `patterns` shape (adapter servers).
+    const shorthand = patternsDataFromServer([
+      { id: "hexcasting:add", startDir: "NORTH_EAST", angles: "waaw" },
+    ]);
+    equal("bare array reply accepted", shorthand.patterns.length, 1);
+    equal("bare array keeps direction", shorthand.patterns[0].startdir, "NORTH_EAST");
+    const malformed = patternsDataFromServer({
+      patterns: [
+        { id: "ok:pattern", startDir: "EAST", angles: "qq" },
+        { id: "bad:pattern", startDir: "SIDEWAYS", angles: "qq" },
+        { id: "bad:signature", startDir: "EAST", angles: "zzz" },
+      ],
+    });
+    equal("invalid entries are dropped", malformed.patterns.length, 1);
+    equal("dropped entries are recorded in gaps", malformed.gaps?.length, 2);
+
     // ---- run -------------------------------------------------------------
     console.log("\nrun num_1 num_2 add");
     const run = await client.rpc({ cmd: "run", code: "num_1 num_2 add" });
@@ -155,17 +247,36 @@ async function main() {
     equal("top iota type", top?.type, "hexcasting:double");
     equal("resolution", snapshot.resolution, "EVALUATED");
     equal("mishaps", snapshot.mishaps, []);
+    equal("no ravenmind before write", snapshot.ravenmind, null);
+
+    const written = await client.rpc({
+      cmd: "run",
+      code: "num_7 write_ravenmind",
+    });
+    const writtenSnapshot = toSnapshot(written);
+    check(
+      "ravenmind is an iota after write",
+      writtenSnapshot.ravenmind != null
+        && typeof writtenSnapshot.ravenmind === "object",
+      JSON.stringify(writtenSnapshot.ravenmind),
+    );
+    equal(
+      "ravenmind holds the written value",
+      writtenSnapshot.ravenmind?.text,
+      "7.00",
+    );
 
     // ---- run with a mishap ----------------------------------------------
     console.log("\nrun with a mishap");
-    const bad = await client.rpc({ cmd: "run", code: "add" });
+    const bad = await client.rpc({ cmd: "run", code: "add add add" });
     check("mishap run reports ok:false", bad.ok === false);
     const badSnapshot = toSnapshot(bad);
     equal("mishap snapshot ok", badSnapshot.ok, false);
+    equal("mishap reply omits the stack", badSnapshot.stack, null);
     check(
-      "stack has no numbers left",
-      (badSnapshot.stack ?? []).length === 0,
-      JSON.stringify(badSnapshot.stack),
+      "mergeStack keeps the previous stack on a mishap",
+      mergeStack(writtenSnapshot, badSnapshot).stack?.length === 2,
+      JSON.stringify(mergeStack(snapshot, badSnapshot).stack),
     );
 
     // ---- stack / reset ---------------------------------------------------
@@ -178,12 +289,17 @@ async function main() {
     equal(
       "stack command returns the session stack",
       stackSnapshot.stack?.map((iota) => iota.value),
-      [3, 9],
+      [3, 7, 9],
     );
     check(
       "ravenmind survives snapshot",
       stackSnapshot.ravenmind != null,
       JSON.stringify(stackSnapshot.ravenmind),
+    );
+    equal(
+      "ravenmind still holds 7 after another run",
+      stackSnapshot.ravenmind?.text,
+      "7.00",
     );
 
     const reset = await client.rpc({ cmd: "reset" });
@@ -230,13 +346,7 @@ async function main() {
 
     // ---- hexParse --------------------------------------------------------
     console.log("\nhexParse");
-    const { readFile } = await import("node:fs/promises");
-    const patternsData = JSON.parse(
-      await readFile(
-        path.join(projectRoot, "public/data/patterns.json"),
-        "utf8",
-      ),
-    );
+    const patternsData = registry;
 
     const parsed = parseHex("num_1 num_2 add", patternsData);
     equal("parses 3 patterns", parsed.patterns.length, 3);
@@ -286,6 +396,27 @@ async function main() {
     check(
       "out-of-table number is rejected, not mis-encoded",
       Object.keys(greedy.errors).length === 1,
+    );
+
+    console.log("\noffline registry");
+    equal(
+      "built-in number table is bundled",
+      Object.keys(BUILTIN_NUMBERS).length,
+      4001,
+    );
+    const offlineNum = parseHex("num_1", OFFLINE_PATTERNS_DATA);
+    equal("numbers parse offline", offlineNum.patterns.length, 1);
+    const offlineMask = parseHex("mask_-v--", OFFLINE_PATTERNS_DATA);
+    equal("masks parse offline", offlineMask.patterns.length, 1);
+    const offlineNamed = parseHex("hexcasting:add", OFFLINE_PATTERNS_DATA);
+    equal("qualified names need a registry", offlineNamed.patterns.length, 0);
+    check(
+      "offline qualified name is reported",
+      Object.keys(offlineNamed.errors).length === 1,
+    );
+    check(
+      "registry is not bundled into the offline data",
+      OFFLINE_PATTERNS_DATA.patterns.length === 0,
     );
 
     // ---- snapshot fallbacks ---------------------------------------------

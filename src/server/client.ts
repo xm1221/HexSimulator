@@ -5,7 +5,12 @@
  * ordinary fetch plumbing plus friendly error classification.
  */
 
-import type { HealthResponse, RpcRequest, RpcResponse } from "./types.ts";
+import type {
+  HealthResponse,
+  PatternListPayload,
+  RpcRequest,
+  RpcResponse,
+} from "./types.ts";
 
 export interface ServerConfig {
   /** Base URL such as `http://127.0.0.1:8742` (or `.../v1`). */
@@ -18,6 +23,7 @@ export class RpcError extends Error {
   readonly kind:
     | "invalid-url"
     | "mixed-content"
+    | "private-network"
     | "network"
     | "cors"
     | "timeout"
@@ -103,6 +109,49 @@ export function isMixedContentBlocked(baseUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * True when the page is public HTTPS and the target is a loopback / private
+ * address. Chrome's Private Network Access rules block these requests from
+ * public pages even when the server sends permissive CORS headers.
+ */
+export function isPrivateNetworkBlocked(baseUrl: string): boolean {
+  if (typeof location === "undefined" || location.protocol !== "https:") {
+    return false;
+  }
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  if (
+    host === "localhost"
+    || host.endsWith(".localhost")
+    || host === "127.0.0.1"
+    || host === "::1"
+    || host === "[::1]"
+  ) {
+    return true;
+  }
+  // RFC 1918 / link-local.
+  if (/^10\./.test(host) || /^192\.168\./.test(host)) {
+    return true;
+  }
+  const match = /^172\.(\d{1,3})\./.exec(host);
+  if (match != null) {
+    const second = Number(match[1]);
+    if (second >= 16 && second <= 31) {
+      return true;
+    }
+  }
+  // Treat the page's own origin as same-origin, not private.
+  return location.hostname.toLowerCase() !== host && host.endsWith(".local");
 }
 
 interface RequestOptions {
@@ -194,6 +243,11 @@ export class RpcClient {
     }
   }
 
+  /** True when the page is public HTTPS and the target is loopback/LAN. */
+  get privateNetworkSuspected(): boolean {
+    return isPrivateNetworkBlocked(this.endpoints.healthUrl);
+  }
+
   private authHeaders(): Record<string, string> {
     const token = this.config.token.trim();
     return token === "" ? {} : { Authorization: `Bearer ${token}` };
@@ -244,5 +298,48 @@ export class RpcClient {
       );
     }
     return body;
+  }
+
+  /**
+   * Fetch the registered pattern list.
+   *
+   * Accepts both documented placements: `data.patterns` and a top-level
+   * `patterns` array (older/adapter servers). Returns the raw payload; call
+   * `fromPatternsListReply` in `hexparse/registry.ts` to normalize it.
+   */
+  async patternsList(options?: RequestOptions): Promise<PatternListPayload> {
+    const reply = await this.rpc({ cmd: "patterns.list" }, options);
+
+    if (reply.ok === false) {
+      throw new RpcError(
+        "http-status",
+        reply.data?.error != null
+          ? String(reply.data.error)
+          : "Server refused patterns.list",
+        { detail: JSON.stringify(reply.data ?? {}).slice(0, 300) },
+      );
+    }
+
+    const fromData = reply.data as PatternListPayload | undefined;
+    const fromTop = (reply as unknown as PatternListPayload).patterns;
+    const patterns = Array.isArray(fromData?.patterns)
+      ? fromData.patterns
+      : Array.isArray(fromTop)
+        ? fromTop
+        : null;
+
+    if (patterns == null) {
+      throw new RpcError(
+        "bad-json",
+        "patterns.list reply has no pattern array (expected data.patterns or patterns)",
+        { detail: JSON.stringify(reply).slice(0, 300) },
+      );
+    }
+
+    return {
+      ...fromData,
+      patterns,
+      numbers: fromData?.numbers ?? undefined,
+    };
   }
 }

@@ -15,6 +15,8 @@ export interface PatternRecord {
 export interface PatternsData {
   version: number;
   generated_from: number;
+  /** Where the registry came from (`mock-hexcli`, `mielib-hexcli`, …). */
+  source?: string;
   /** Failed package installs, if any. Shape may be string or {package, reason}. */
   gaps?: unknown[];
   packages?: string[];

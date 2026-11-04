@@ -6,9 +6,11 @@
  *   node scripts/mock-server.mjs [--port 8742] [--token secret]
  *
  * Implements: GET /v1/health, POST /v1/rpc with ping / run / stack / reset /
- * step.begin / step.next / step.abort. `run` understands a tiny subset of
- * hexParse source (`num_<n>` and `add` / `subtract` / `multiply`) so the
- * `num_1 num_2 add` example really produces 3 on top of the stack.
+ * step.begin / step.next / step.abort, and **patterns.list** (the runtime
+ * pattern registry HexSimulator fetches on first connect and caches per URL).
+ * `run` understands a tiny subset of hexParse source (`num_<n>` and `add` /
+ * `subtract` / `multiply`) so the `num_1 num_2 add` example really produces 3
+ * on top of the stack.
  */
 
 import { createServer } from "node:http";
@@ -17,6 +19,25 @@ export function createMockServer({ token = null } = {}) {
   /** Bottom -> top. */
   let stack = [];
   let step = null;
+  /** Ravenmind iota; `null` until a cast writes one. */
+  let ravenmind = null;
+
+  /**
+   * Minimal registry. Real servers derive this from the Hex Casting registry;
+   * the mock only needs enough to exercise parsing, glyphs and `run`.
+   */
+  const patternRegistry = [
+    { id: "hexcasting:add", startDir: "NORTH_EAST", angles: "waaw", addon: "hexcasting", aliases: ["add"] },
+    { id: "hexcasting:subtract", startDir: "NORTH_EAST", angles: "wqaw", addon: "hexcasting", aliases: ["subtract", "sub"] },
+    { id: "hexcasting:multiply", startDir: "NORTH_EAST", angles: "waqaw", addon: "hexcasting", aliases: ["multiply", "mul"] },
+    { id: "hexcasting:divide", startDir: "NORTH_EAST", angles: "wdedw", addon: "hexcasting", aliases: ["divide", "div"] },
+    { id: "hexcasting:open_paren", startDir: "WEST", angles: "qaq", addon: "hexcasting", aliases: ["open_paren"] },
+    { id: "hexcasting:close_paren", startDir: "EAST", angles: "ded", addon: "hexcasting", aliases: ["close_paren"] },
+    { id: "hexcasting:escape", startDir: "SOUTH_WEST", angles: "aqae", addon: "hexcasting", aliases: ["escape"] },
+    { id: "hexcasting:get_caster", startDir: "NORTH_EAST", angles: "qaq", addon: "hexcasting", aliases: ["get_caster"] },
+    { id: "hexcasting:print", startDir: "NORTH_EAST", angles: "eawae", addon: "hexcasting", aliases: ["print"] },
+    { id: "miehex:example_pattern", startDir: "EAST", angles: "qqqq", addon: "miehex", aliases: ["miehex_example"] },
+  ];
 
   const iota = {
     number(value) {
@@ -62,8 +83,11 @@ export function createMockServer({ token = null } = {}) {
     },
   });
 
-  const castReply = ({ ok = true, stack: next, mishaps = [], prints = [] }) => {
+  const castReply = ({ ok = true, stack: next, mishaps = [], prints = [], ravenmind: nextRavenmind }) => {
     stack = next;
+    if (nextRavenmind !== undefined) {
+      ravenmind = nextRavenmind;
+    }
     return {
       ok,
       lines: ["[HexCLI] cast"],
@@ -73,7 +97,7 @@ export function createMockServer({ token = null } = {}) {
           steps: 3,
           ops: 3,
           stack,
-          ravenmind: null,
+          ravenmind,
           mishaps,
           mediaUsed: 0,
           mediaDust: 0,
@@ -101,31 +125,50 @@ export function createMockServer({ token = null } = {}) {
         next.push(iota.number(value));
         continue;
       }
-      if (raw === "add" || raw === "subtract" || raw === "multiply") {
+      const op = raw.includes(":")
+        ? raw.slice(raw.indexOf(":") + 1)
+        : raw;
+      if (op === "add" || op === "subtract" || op === "multiply") {
         const b = next.pop();
         const a = next.pop();
         if (a == null || b == null) {
           return mishap("not enough iotas on the stack");
         }
         const value =
-          raw === "add"
+          op === "add"
             ? a.value + b.value
-            : raw === "subtract"
+            : op === "subtract"
               ? a.value - b.value
               : a.value * b.value;
         next.push(iota.number(value));
+        continue;
+      }
+      if (raw === "write_ravenmind") {
+        // Ravenmind write is handled by the caller after execution.
         continue;
       }
       if (raw === "true" || raw === "false") {
         next.push(iota.boolean(raw === "true"));
         continue;
       }
-      // Unknown token: echo it as a pattern iota so the glyph path is covered.
-      // `DIR_signature` splits on the last underscore (directions contain one).
+      // Pattern tokens: `DIR_signature` (directions contain an underscore) or
+      // a registry name/id. Anything else is a parse failure, like HexCLI.
       const underscore = raw.lastIndexOf("_");
       const [dir, angles] =
-        underscore > 0 ? [raw.slice(0, underscore), raw.slice(underscore + 1)] : ["EAST", raw];
-      next.push(iota.pattern(dir, angles));
+        underscore > 0
+          ? [raw.slice(0, underscore), raw.slice(underscore + 1)]
+          : ["EAST", raw];
+      if (/^[wqeasd]+$/.test(angles)) {
+        next.push(iota.pattern(dir, angles));
+        continue;
+      }
+      const known = patternRegistry.some(
+        (entry) => entry.id === raw || entry.aliases?.includes(raw),
+      );
+      if (!known) {
+        return mishap(`unknown pattern: ${raw}`);
+      }
+      next.push(iota.pattern("EAST", "waaw"));
     }
     return castReply({ stack: next });
   };
@@ -149,21 +192,42 @@ export function createMockServer({ token = null } = {}) {
         if (code.trim() === "") {
           return mishap("hexParse produced no iotas");
         }
-        return execute(code);
+        const reply = execute(code);
+        // Exercise the ravenmind overlay: `write_ravenmind` stores the top of
+        // stack, mirroring what Hex Casting's ravenmind write does.
+        if (/\bwrite_ravenmind\b/.test(code)) {
+          const top = stack[stack.length - 1] ?? null;
+          ravenmind = top;
+          if (reply.data?.cast != null) {
+            reply.data.cast.ravenmind = top;
+          }
+        }
+        return reply;
       }
+      case "patterns.list":
+        return {
+          ok: true,
+          lines: [`[HexCLI] ${patternRegistry.length} patterns`],
+          data: {
+            source: "mock-hexcli",
+            version: 1,
+            patterns: patternRegistry,
+          },
+        };
       case "stack":
         return {
           ok: true,
           lines: ["[HexCLI] session state"],
           data: {
             stack: [...stack],
-            ravenmind: iota.pattern("NORTH_EAST", "qaq"),
+            ravenmind,
             parens: 0,
           },
         };
       case "reset":
         stack = [];
         step = null;
+        ravenmind = null;
         return {
           ok: true,
           lines: ["[HexCLI] session reset"],

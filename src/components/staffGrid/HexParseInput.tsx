@@ -10,23 +10,30 @@ import {
   Textarea,
 } from "@mantine/core";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
-import { IconAlertTriangle, IconKeyboard, IconWand } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import {
+  IconAlertTriangle,
+  IconCloudOff,
+  IconKeyboard,
+  IconWand,
+} from "@tabler/icons-react";
+import { useState } from "react";
 
 import { type ResolvedPattern } from "@hextools/renderer/staffGrid";
 
 import {
-  loadPatternsData,
+  OFFLINE_PATTERNS_DATA,
   parseHex,
   parseToResolvedPatterns,
-  type PatternsData,
   type ParseResult,
 } from "../../hexparse";
 import { useI18n } from "../../i18n/I18nContext";
+import { useServer } from "../../simulator/ServerContext";
 import { staffGridButtonProps } from "./StaffGrid.lib";
 
 export interface HexParseInputProps {
   onPatterns: (patterns: readonly ResolvedPattern[]) => unknown;
+  /** Called with the source last used, so the stack panel can run it. */
+  onCode?: (code: string) => unknown;
   /** Clear pan/zoom after replacing the staff. */
   onResetPanAndZoom?: () => unknown;
   disabled?: boolean;
@@ -37,53 +44,32 @@ const PLACEHOLDER = "num_1 num_2 add";
 /**
  * Text-to-pattern input, modelled on HexBug / hexparse.
  *
- * Accepts `num_<n>`, `mask_<mask>`, `<dir>_<sig>`, `_<sig>`, special tokens
- * (`{` `}` `(` `)` `\\` `escape` `intro` `retro`), and named patterns such as
- * `add` or `hexcasting:add`.
+ * Named patterns resolve against the registry fetched from the connected
+ * server (`patterns.list`). Without a connection, numbers, masks and raw
+ * angle signatures still work — the modal says so.
  */
 export default function HexParseInput({
   onPatterns,
+  onCode,
   onResetPanAndZoom,
   disabled,
 }: HexParseInputProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const isMobile = useMediaQuery("(max-width: 30em)");
   const { t, tParseMessage } = useI18n();
+  const { patterns } = useServer();
 
   const [input, setInput] = useState(PLACEHOLDER);
-  const [data, setData] = useState<PatternsData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [result, setResult] = useState<ParseResult | null>(null);
 
-  useEffect(() => {
-    if (!opened || data != null) {
-      return;
-    }
-    let cancelled = false;
-    loadPatternsData()
-      .then((loaded) => {
-        if (!cancelled) {
-          setData(loaded);
-          setLoadError(null);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [opened, data]);
+  const data = patterns.data ?? OFFLINE_PATTERNS_DATA;
+  const hasRegistry = (patterns.data?.patterns.length ?? 0) > 0;
 
   const onParse = () => {
-    if (data == null) {
-      return;
-    }
     const parsed = parseHex(input, data);
     setResult(parsed);
     onPatterns(parseToResolvedPatterns(input, data));
+    onCode?.(input);
     onResetPanAndZoom?.();
     close();
   };
@@ -113,15 +99,22 @@ export default function HexParseInput({
             minRows={4}
             maxRows={10}
             data-autofocus
+            ff="monospace"
           />
 
-          {loadError != null && (
+          {!hasRegistry && (
+            <Alert color="yellow" icon={<IconCloudOff />} title={t("hexParse.offlineBadge")}>
+              <Text size="sm">{t("hexParse.serverRequired")}</Text>
+            </Alert>
+          )}
+
+          {patterns.error != null && (
             <Alert
               color="red"
               icon={<IconAlertTriangle />}
               title={t("hexParse.loadError")}
             >
-              {tParseMessage(loadError)}
+              <Text size="sm">{patterns.error.message}</Text>
             </Alert>
           )}
 
@@ -167,14 +160,22 @@ export default function HexParseInput({
             </Group>
           )}
 
-          <Button
-            leftSection={<IconWand />}
-            onClick={onParse}
-            loading={data == null && loadError == null}
-            disabled={Boolean(disabled) || data == null}
-          >
-            {t("hexParse.parseAndDraw")}
-          </Button>
+          <Group gap="xs">
+            <Button
+              leftSection={<IconWand />}
+              onClick={onParse}
+              disabled={Boolean(disabled)}
+            >
+              {t("hexParse.parseAndDraw")}
+            </Button>
+            <Badge variant="default" color={hasRegistry ? "teal" : "gray"}>
+              {hasRegistry
+                ? t("hexParse.registry", {
+                    n: patterns.data?.patterns.length ?? 0,
+                  })
+                : t("hexParse.offlineBadge")}
+            </Badge>
+          </Group>
         </Stack>
       </Modal>
 

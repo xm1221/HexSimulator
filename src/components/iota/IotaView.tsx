@@ -6,10 +6,12 @@
  * text + type badge fallback for everything else.
  */
 
+import { Badge, Box, Code, Collapse, Group, Text, UnstyledButton } from "@mantine/core";
+import { IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
 
-import type { Iota, RichSegment } from "../server/types.ts";
-import { useI18n } from "../i18n/I18nContext.ts";
+import { useI18n } from "../../i18n/I18nContext.ts";
+import type { Iota, RichSegment } from "../../server/types.ts";
 import { PatternGlyph, patternFromIota } from "./PatternGlyph.tsx";
 
 export function shortType(type: string): string {
@@ -60,7 +62,7 @@ export interface IotaViewProps {
   iota: Iota;
   /** Nesting depth, used for list indentation. */
   depth?: number;
-  /** Top-level stack rows start expanded-and-compact; nested lists collapsed. */
+  /** Nested lists start collapsed; top-level stack rows are compact. */
   defaultOpen?: boolean;
 }
 
@@ -73,9 +75,11 @@ export default function IotaView({ iota }: IotaViewProps) {
     case "boolean":
       return <BooleanIota iota={iota} />;
     case "null":
-      return <SimpleChip kind="null" text={iota.text || "null"} iota={iota} />;
+      return <SimpleChip tone="dim" text={iota.text || "null"} title={iota.type} />;
     case "garbage":
-      return <SimpleChip kind="garbage" text={iota.text || "<garbage>"} iota={iota} />;
+      return (
+        <SimpleChip tone="red" text={iota.text || "<garbage>"} title={iota.type} />
+      );
     case "vector":
       return <VectorIota iota={iota} />;
     case "pattern":
@@ -91,23 +95,40 @@ export default function IotaView({ iota }: IotaViewProps) {
 
 // ---- individual kinds -----------------------------------------------------
 
-function NumberIota({ iota }: { iota: Iota }) {
-  const value = typeof iota.value === "number" ? iota.value : Number(iota.text);
-  const display = Number.isFinite(value)
-    ? formatNumber(value)
-    : iota.text;
-  const isInteger = Number.isFinite(value) && Number.isInteger(value);
+function MonoValue({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
-    <span className={`iota-chip iota-chip--number${isInteger ? "" : " iota-chip--decimal"}`}>
-      <span className="iota-chip__sigil" aria-hidden="true">
-        #
-      </span>
-      <span className="iota-chip__value">{display}</span>
-    </span>
+    <Text
+      component="span"
+      ff="monospace"
+      fz="sm"
+      lh={1.3}
+      title={title}
+      style={{ overflowWrap: "anywhere" }}
+    >
+      {children}
+    </Text>
   );
 }
 
-function formatNumber(value: number): string {
+function NumberIota({ iota }: { iota: Iota }) {
+  const value = typeof iota.value === "number" ? iota.value : Number(iota.text);
+  const display = Number.isFinite(value) ? formatNumber(value) : iota.text;
+  const isInteger = Number.isFinite(value) && Number.isInteger(value);
+  return (
+    <Group gap={6} wrap="nowrap" align="baseline">
+      <Text component="span" fz="xs" c="dimmed" ff="monospace" aria-hidden="true">
+        #
+      </Text>
+      <MonoValue title={iota.text}>
+        <span style={{ color: isInteger ? undefined : "var(--mantine-color-grape-4)" }}>
+          {display}
+        </span>
+      </MonoValue>
+    </Group>
+  );
+}
+
+export function formatNumber(value: number): string {
   if (Number.isInteger(value)) {
     return String(value);
   }
@@ -121,31 +142,34 @@ function BooleanIota({ iota }: { iota: Iota }) {
       : iota.text.trim().toLowerCase() === "true";
   const { t } = useI18n();
   return (
-    <span className={`iota-chip iota-chip--boolean ${value ? "is-true" : "is-false"}`}>
-      <span className="iota-chip__sigil" aria-hidden="true">
+    <Group gap={6} wrap="nowrap" align="baseline">
+      <Text
+        component="span"
+        fz="sm"
+        ff="monospace"
+        c={value ? "teal.4" : "red.4"}
+        aria-label={t("iota.boolean")}
+      >
         {value ? "✓" : "✕"}
-      </span>
-      <span className="iota-chip__value">
-        {value ? "true" : "false"}
-      </span>
-      <span className="sr-only">{t("iota.boolean")}</span>
-    </span>
+      </Text>
+      <MonoValue>{value ? "true" : "false"}</MonoValue>
+    </Group>
   );
 }
 
 function SimpleChip({
-  kind,
+  tone,
   text,
-  iota,
+  title,
 }: {
-  kind: "null" | "garbage";
+  tone: "dim" | "red";
   text: string;
-  iota: Iota;
+  title?: string;
 }) {
   return (
-    <span className={`iota-chip iota-chip--${kind}`} title={iota.type}>
-      <span className="iota-chip__value">{text}</span>
-    </span>
+    <Code c={tone === "red" ? "red.4" : "dimmed"} title={title} style={{ wordBreak: "break-all" }}>
+      {text}
+    </Code>
   );
 }
 
@@ -154,9 +178,10 @@ function SimpleChip({
  * (Hex Casting uses `(x, y, z)`).
  */
 export function parseVectorText(text: string): [number, number, number] | null {
-  const match = /^\s*[([{]\s*(-?[\d.eE+]+)\s*[,;]\s*(-?[\d.eE+]+)\s*[,;]\s*(-?[\d.eE+]+)\s*[)\]}]/.exec(
-    text,
-  );
+  const match =
+    /^\s*[([{]\s*(-?[\d.eE+]+)\s*[,;]\s*(-?[\d.eE+]+)\s*[,;]\s*(-?[\d.eE+]+)\s*[)\]}]/.exec(
+      text,
+    );
   if (match == null) {
     return null;
   }
@@ -169,9 +194,7 @@ function VectorIota({ iota }: { iota: Iota }) {
   const components =
     parsed ??
     (Array.isArray(iota.value)
-      ? (iota.value as unknown[])
-          .slice(0, 3)
-          .map((component) => Number(component))
+      ? (iota.value as unknown[]).slice(0, 3).map((component) => Number(component))
       : null);
 
   if (components == null || components.length < 3) {
@@ -179,19 +202,19 @@ function VectorIota({ iota }: { iota: Iota }) {
   }
 
   return (
-    <span className="iota-chip iota-chip--vector" title={iota.text}>
-      <span className="iota-chip__sigil" aria-hidden="true">
+    <Group gap={8} wrap="nowrap" align="baseline" title={iota.text}>
+      <Text component="span" fz="xs" c="dimmed" aria-hidden="true">
         ➤
-      </span>
-      <span className="iota-vector">
-        {components.slice(0, 3).map((component, index) => (
-          <span key={index} className="iota-vector__component">
-            <span className="iota-vector__axis">{["x", "y", "z"][index]}</span>
-            {formatNumber(component)}
-          </span>
-        ))}
-      </span>
-    </span>
+      </Text>
+      {components.slice(0, 3).map((component, index) => (
+        <Text key={index} component="span" ff="monospace" fz="sm">
+          <Text component="span" fz="xs" c="dimmed">
+            {["x", "y", "z"][index]}
+          </Text>
+          {formatNumber(component)}
+        </Text>
+      ))}
+    </Group>
   );
 }
 
@@ -202,30 +225,27 @@ function PatternIota({ iota }: { iota: Iota }) {
   const label = iota.text?.trim() || pattern?.toString() || t("iota.pattern");
 
   return (
-    <span className="iota-chip iota-chip--pattern" title={iota.text}>
+    <Group gap={8} wrap="nowrap" align="center" title={iota.text}>
       {pattern != null ? (
-        <PatternGlyph
-          pattern={pattern}
-          size={30}
-          color={color}
-          title={label}
-        />
+        <PatternGlyph pattern={pattern} size={30} color={color} title={label} />
       ) : (
-        <span className="iota-chip__sigil" aria-hidden="true">
+        <Text component="span" fz="sm" c="dimmed" aria-hidden="true">
           ✦
-        </span>
+        </Text>
       )}
-      <span className="iota-pattern-text">
+      <Box style={{ minWidth: 0 }}>
         {pattern != null && label !== pattern.toString() ? (
-          <>
-            <span className="iota-pattern-text__name">{label}</span>
-            <code className="iota-pattern-text__sig">{pattern.toString()}</code>
-          </>
-        ) : (
-          <code className="iota-pattern-text__sig">{label}</code>
-        )}
-      </span>
-    </span>
+          <Text fz="xs" truncate>
+            {label}
+          </Text>
+        ) : null}
+        <Code fz="xs" c="dimmed">
+          {pattern != null && label !== pattern.toString()
+            ? pattern.toString()
+            : label}
+        </Code>
+      </Box>
+    </Group>
   );
 }
 
@@ -241,31 +261,35 @@ function EntityIota({ iota }: { iota: Iota }) {
       : null;
 
   return (
-    <span className="iota-chip iota-chip--entity" title={iota.text}>
-      <span className="iota-chip__sigil" aria-hidden="true">
+    <Group gap={6} wrap="nowrap" align="center" title={iota.text}>
+      <Text component="span" fz="xs" c="dimmed" aria-hidden="true">
         ☺
-      </span>
-      <span className="iota-entity">
-        <span className="iota-entity__name">
+      </Text>
+      <Box style={{ minWidth: 0 }}>
+        <Text fz="sm" truncate>
           {entity.name ?? shortType(entity.type ?? "entity")}
-        </span>
-        <code className="iota-entity__type">{entity.type}</code>
-        {position != null && (
-          <span className="iota-entity__pos">
-            {t("iota.position", {
-              x: position[0],
-              y: position[1],
-              z: position[2],
-            })}
-          </span>
-        )}
-        {entity.uuid != null && (
-          <span className="iota-entity__uuid" title={entity.uuid}>
-            {entity.uuid.slice(0, 8)}
-          </span>
-        )}
-      </span>
-    </span>
+        </Text>
+        <Group gap={6}>
+          <Code fz="xs" c="dimmed">
+            {entity.type}
+          </Code>
+          {position != null && (
+            <Text fz="xs" c="dimmed">
+              {t("iota.position", {
+                x: position[0],
+                y: position[1],
+                z: position[2],
+              })}
+            </Text>
+          )}
+          {entity.uuid != null && (
+            <Text fz="xs" c="dimmed" ff="monospace" title={entity.uuid}>
+              {entity.uuid.slice(0, 8)}
+            </Text>
+          )}
+        </Group>
+      </Box>
+    </Group>
   );
 }
 
@@ -275,39 +299,45 @@ function ListIota({ iota }: { iota: Iota }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <span className={`iota-list${open ? " is-open" : ""}`}>
-      <button
-        type="button"
-        className="iota-list__toggle"
+    <Box>
+      <UnstyledButton
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         disabled={children.length === 0}
+        style={{ display: "block", width: "100%" }}
       >
-        <span className="iota-list__caret" aria-hidden="true">
-          {children.length === 0 ? "·" : open ? "▾" : "▸"}
-        </span>
-        <span className="iota-chip iota-chip--list">
-          <span className="iota-chip__sigil" aria-hidden="true">
+        <Group gap={6} wrap="nowrap">
+          <IconChevronRight
+            size={14}
+            style={{
+              transform: open ? "rotate(90deg)" : undefined,
+              transition: "transform 120ms ease",
+              flex: "0 0 auto",
+            }}
+          />
+          <Badge variant="light" color="grape" size="sm" radius="sm">
             [ ]
-          </span>
-          <span className="iota-chip__value">
+          </Badge>
+          <Text fz="sm" c="dimmed">
             {t("iota.listCount", { n: children.length })}
-          </span>
-        </span>
-      </button>
-      {children.length > 0 && (
-        <span className="iota-list__body" hidden={!open}>
+          </Text>
+        </Group>
+      </UnstyledButton>
+      <Collapse expanded={open}>
+        <Box pl={22} pt={6}>
           {children.map((child, index) => (
-            <span key={index} className="iota-list__item">
-              <span className="iota-list__bullet" aria-hidden="true">
+            <Group key={index} gap={6} wrap="nowrap" align="flex-start" mb={4}>
+              <Text fz="xs" c="dimmed" ff="monospace" w={16} ta="right" pt={2}>
                 {index + 1}
-              </span>
-              <IotaView iota={child} depth={1} />
-            </span>
+              </Text>
+              <Box style={{ minWidth: 0 }}>
+                <IotaView iota={child} depth={1} />
+              </Box>
+            </Group>
           ))}
-        </span>
-      )}
-    </span>
+        </Box>
+      </Collapse>
+    </Box>
   );
 }
 
@@ -315,18 +345,25 @@ function GenericIota({ iota }: { iota: Iota }) {
   const { t } = useI18n();
   const rich = iota.rich;
   return (
-    <span className="iota-chip iota-chip--generic" title={iota.type}>
-      <span className="iota-chip__value">
-        {rich != null && rich.length > 0 ? (
-          <RichText segments={rich} fallback={iota.text} />
-        ) : (
-          iota.text
-        )}
-      </span>
-      <span className="iota-badge" title={t("iota.typeBadge", { type: iota.type })}>
+    <Group gap={8} wrap="nowrap" align="center" title={iota.type}>
+      <Box style={{ minWidth: 0 }}>
+        <Text fz="sm" style={{ overflowWrap: "anywhere" }}>
+          {rich != null && rich.length > 0 ? (
+            <RichText segments={rich} fallback={iota.text} />
+          ) : (
+            iota.text
+          )}
+        </Text>
+      </Box>
+      <Badge
+        variant="default"
+        size="xs"
+        radius="sm"
+        title={t("iota.typeBadge", { type: iota.type })}
+      >
         {shortType(iota.type)}
-      </span>
-    </span>
+      </Badge>
+    </Group>
   );
 }
 
@@ -351,7 +388,6 @@ export function RichText({
             fontStyle: segment.italic ? "italic" : undefined,
             textDecoration: segment.underlined ? "underline" : undefined,
           }}
-          className={segment.obfuscated ? "is-obfuscated" : undefined}
         >
           {segment.text}
         </span>

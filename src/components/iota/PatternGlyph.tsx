@@ -1,14 +1,39 @@
 /**
  * Miniature staff glyph for a pattern iota.
  *
- * Uses the same hex geometry as the drawing canvas, rendered as inline SVG so
- * it can appear anywhere in the stack / step preview without a canvas.
+ * Shares the hex geometry with the drawing canvas, rendered as inline SVG so
+ * it can appear anywhere in the stack / ravenmind panel without a canvas.
  */
 
-import { coordToPx, HexDir, HexPattern } from "../canvas/hex.ts";
-import type { IotaPattern } from "../server/types.ts";
+import { coordToPx, HexDir, type HexCoord, HexPattern } from "@hextools/renderer/staffGrid";
+
+import type { IotaPattern } from "../../server/types.ts";
 
 const SIZE = 7;
+
+const DIRECTION_NAMES: Record<string, HexDir> = {
+  NORTH_EAST: HexDir.NORTH_EAST,
+  NORTHEAST: HexDir.NORTH_EAST,
+  NE: HexDir.NORTH_EAST,
+  EAST: HexDir.EAST,
+  E: HexDir.EAST,
+  SOUTH_EAST: HexDir.SOUTH_EAST,
+  SOUTHEAST: HexDir.SOUTH_EAST,
+  SE: HexDir.SOUTH_EAST,
+  SOUTH_WEST: HexDir.SOUTH_WEST,
+  SOUTHWEST: HexDir.SOUTH_WEST,
+  SW: HexDir.SOUTH_WEST,
+  WEST: HexDir.WEST,
+  W: HexDir.WEST,
+  NORTH_WEST: HexDir.NORTH_WEST,
+  NORTHWEST: HexDir.NORTH_WEST,
+  NW: HexDir.NORTH_WEST,
+};
+
+export function directionFromName(name: string): HexDir | null {
+  const key = name.trim().toUpperCase().replaceAll("-", "_").replaceAll(" ", "_");
+  return DIRECTION_NAMES[key] ?? DIRECTION_NAMES[key.replaceAll("_", "")] ?? null;
+}
 
 export interface PatternGlyphProps {
   pattern: HexPattern;
@@ -28,7 +53,9 @@ export function PatternGlyph({
   title,
 }: PatternGlyphProps) {
   const coords = [...pattern.positions()];
-  const points = coords.map((coord) => coordToPx(coord, SIZE));
+  const points = coords.map((coord: HexCoord) =>
+    coordToPx({ coord, size: SIZE, offset: [0, 0] }),
+  );
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -55,15 +82,17 @@ export function PatternGlyph({
     .join(" ");
 
   const head = points[points.length - 1];
+  // One filter id per instance keeps multiple glyphs from sharing a DOM id.
+  const glowId = `hexglyph-glow-${pattern.toString().replace(/\W+/g, "-")}`;
 
   return (
     <svg
-      className="pattern-glyph"
       width={size}
       height={size}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label={title ?? pattern.toString()}
+      style={{ flex: "0 0 auto", display: "block" }}
     >
       <title>{title ?? pattern.toString()}</title>
       <g transform={`scale(${scale})`}>
@@ -75,7 +104,7 @@ export function PatternGlyph({
           strokeLinecap="round"
           strokeLinejoin="round"
           opacity={glow ? 0.35 : 0.7}
-          filter={glow ? "url(#hexglyph-glow)" : undefined}
+          filter={glow ? `url(#${glowId})` : undefined}
         />
         <path
           d={path}
@@ -99,13 +128,13 @@ export function PatternGlyph({
           cx={head.x}
           cy={head.y}
           r={SIZE * 0.16}
-          fill="#6ff0e0"
+          fill="currentColor"
           opacity={0.9}
         />
       </g>
       {glow && (
         <defs>
-          <filter id="hexglyph-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation={SIZE * 0.18} />
           </filter>
         </defs>
@@ -129,7 +158,7 @@ export function patternFromIota(
       typeof pattern.startDir === "number"
         ? (pattern.startDir as HexDir)
         : pattern.startDir != null
-          ? HexDir.fromName(String(pattern.startDir))
+          ? directionFromName(String(pattern.startDir))
           : null;
     if (startDir != null) {
       const angles = pattern.angles ?? pattern.signature ?? "";
@@ -143,7 +172,7 @@ export function patternFromIota(
   // `NORTH_EAST waaw`, `north_east waaw`, `ne waaw`, or just `waaw`.
   const match = /^\s*([A-Za-z_]+)?\s+([wqeasd]+)\s*$/.exec(text);
   if (match != null) {
-    const dir = match[1] != null ? HexDir.fromName(match[1]) : HexDir.EAST;
+    const dir = match[1] != null ? directionFromName(match[1]) : HexDir.EAST;
     if (dir != null) {
       return HexPattern.fromSignature(dir, match[2]);
     }

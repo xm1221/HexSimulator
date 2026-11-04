@@ -1,7 +1,7 @@
-import { Stack } from "@mantine/core";
+import { Alert, Stack } from "@mantine/core";
 import { useHotkeys, useStateHistory } from "@mantine/hooks";
 import _ from "lodash";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StaffGrid, type StaffGridRef, useDeviceMotion } from "@hextools/react";
 import { useIsTouchscreen } from "@hextools/react";
@@ -14,13 +14,22 @@ import {
   type ResolvedPattern,
 } from "@hextools/renderer/staffGrid";
 
+import { patternsToCode } from "../../hexparse";
+import { useI18n } from "../../i18n/I18nContext";
+import { useServer } from "../../simulator/ServerContext";
 import HexParseInput from "./HexParseInput";
+import RavenmindPanel from "./RavenmindPanel";
+import StackPanel from "./StackPanel";
 import type { HexToolsGridSettings } from "./StaffGrid.lib";
 import StaffGridControls from "./StaffGridControls";
 import StaffGridTimer from "./StaffGridTimer";
 
+type SourceMode = "code" | "drawn";
+
 export default function StaffGridPage() {
   const isTouchscreen = useIsTouchscreen();
+  const { t } = useI18n();
+  const { status, run, error } = useServer();
 
   const [patterns, patternsHandlers, patternsHistory] = useStateHistory<
     readonly ResolvedPattern[]
@@ -37,6 +46,24 @@ export default function StaffGridPage() {
   const [prevDrawTimeMs, setPrevDrawTimeMs] = useState<number | null>(null);
 
   const staffGridRef = useRef<StaffGridRef>(null);
+
+  const [hexCode, setHexCode] = useState("");
+  const [sourceMode, setSourceMode] = useState<SourceMode>("code");
+  const [toast, setToast] = useState<{ text: string; kind: "ok" | "error" } | null>(
+    null,
+  );
+
+  const notify = useCallback((text: string, kind: "ok" | "error" = "ok") => {
+    setToast({ text, kind });
+  }, []);
+
+  useEffect(() => {
+    if (toast == null) {
+      return;
+    }
+    const timer = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const defaultSettings: HexToolsGridSettings = {
     ...GuiSpellcasting.getDefaultSettings({
@@ -124,8 +151,30 @@ export default function StaffGridPage() {
             : other,
         ),
       );
+      return;
     }
+    // A hand-drawn staff is what the user means to cast.
+    setSourceMode("drawn");
   };
+
+  const staffCode = patternsToCode(patterns);
+  const effectiveCode =
+    sourceMode === "drawn"
+      ? staffCode
+      : hexCode.trim() !== ""
+        ? hexCode
+        : staffCode;
+
+  const onRun = () => {
+    const code = effectiveCode.trim();
+    if (code === "") {
+      notify(t("stack.unknown"), "error");
+      return;
+    }
+    void run(code);
+  };
+
+  const connected = status === "connected";
 
   return (
     <>
@@ -146,12 +195,78 @@ export default function StaffGridPage() {
         />
       )}
 
-      <Stack gap="xs" pos="absolute" top={16} left={16}>
-        <HexParseInput
-          onPatterns={patternsHandlers.set}
-          onResetPanAndZoom={onResetPanAndZoom}
-        />
+      {/* Top-left: ravenmind + hexParse entry. */}
+      <Stack
+        gap="xs"
+        pos="absolute"
+        top={16}
+        left={16}
+        style={{ pointerEvents: "none" }}
+      >
+        <div style={{ pointerEvents: "auto" }}>
+          <RavenmindPanel />
+        </div>
+        <div style={{ pointerEvents: "auto" }}>
+          <HexParseInput
+            onPatterns={patternsHandlers.set}
+            onCode={(code) => {
+              setHexCode(code);
+              setSourceMode("code");
+            }}
+            onResetPanAndZoom={onResetPanAndZoom}
+          />
+        </div>
       </Stack>
+
+      {/* Top-right: live stack / run controls. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 16,
+          right: 16,
+          pointerEvents: "auto",
+        }}
+      >
+        <StackPanel
+          code={effectiveCode}
+          sourceIsDrawn={sourceMode === "drawn"}
+          onToggleSource={() =>
+            setSourceMode((mode) => (mode === "drawn" ? "code" : "drawn"))
+          }
+          onRun={onRun}
+          notify={notify}
+        />
+      </div>
+
+      {!connected && error != null && (
+        <Alert
+          color="red"
+          pos="absolute"
+          bottom={16}
+          left="50%"
+          style={{ transform: "translateX(-50%)", maxWidth: 520, zIndex: 5 }}
+        >
+          {t("server.notConnected")}
+        </Alert>
+      )}
+
+      {toast != null && (
+        <Alert
+          color={toast.kind === "ok" ? "teal" : "red"}
+          pos="absolute"
+          bottom={16}
+          left="50%"
+          style={{
+            transform: "translateX(-50%)",
+            maxWidth: 420,
+            zIndex: 10,
+          }}
+          py={6}
+          px="md"
+        >
+          {toast.text}
+        </Alert>
+      )}
 
       <StaffGridControls
         patterns={patterns}

@@ -10,7 +10,7 @@ import { I18nContext, type I18nContextValue } from "./I18nContext";
 import type { Language, MessageKey, MessageVars } from "./messages";
 import { messages, translateParseMessage } from "./messages";
 
-const STORAGE_KEY = "hextools-lang";
+const STORAGE_KEY = "hexsimulator-lang";
 
 function isLanguage(value: unknown): value is Language {
   return value === "en" || value === "zh";
