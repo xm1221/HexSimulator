@@ -22,7 +22,8 @@ const en = {
   "server.open": "Server connection",
   "server.url": "Server URL",
   "server.urlDescription":
-    "HexCLI-compatible HTTP endpoint (GET /v1/health, POST /v1/rpc).",
+    "HexCLI-compatible HTTP endpoint (GET /v1/health, POST /v1/rpc). "
+    + "For a GitHub Codespace use https://<codespace>-8742.app.github.dev.",
   "server.token": "Token (optional)",
   "server.tokenDescription":
     "Sent as Authorization: Bearer. Stored in this browser only.",
@@ -187,7 +188,8 @@ const zh: Record<MessageKey, string> = {
   "server.open": "服务端连接",
   "server.url": "服务端 URL",
   "server.urlDescription":
-    "兼容 HexCLI 的 HTTP 端点（GET /v1/health，POST /v1/rpc）。",
+    "兼容 HexCLI 的 HTTP 端点（GET /v1/health，POST /v1/rpc）。"
+    + "用 GitHub Codespaces 当后端时填 https://<codespace>-8742.app.github.dev。",
   "server.token": "令牌（可选）",
   "server.tokenDescription":
     "以 Authorization: Bearer 发送，只保存在当前浏览器。",
