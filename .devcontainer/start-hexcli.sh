@@ -73,7 +73,11 @@ jar_has_http_endpoint() {
   local jar="$1"
   [ -f "$jar" ] || return 1
   # `unzip -l` avoids needing a JDK for the check.
-  unzip -l "$jar" 2>/dev/null | grep -q 'cn/xm1221/MieLib/hexcli/remote/HexCliHttp.class'
+  # Read the whole listing first: `grep -q` exiting early would SIGPIPE unzip,
+  # and with `pipefail` that turns a match into a failure.
+  local listing
+  listing=$(unzip -l "$jar" 2>/dev/null) || return 1
+  grep -q 'cn/xm1221/MieLib/hexcli/remote/HexCliHttp.class' <<<"$listing"
 }
 
 mielib_jar_in_mods() {
