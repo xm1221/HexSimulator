@@ -47,7 +47,7 @@ export default function StaffGridPage() {
 
   const staffGridRef = useRef<StaffGridRef>(null);
 
-  const [hexCode, setHexCode] = useState("");
+  const [hexCode, setHexCode] = useState("num_1 num_2 add");
   const [sourceMode, setSourceMode] = useState<SourceMode>("code");
   const [toast, setToast] = useState<{ text: string; kind: "ok" | "error" } | null>(
     null,
