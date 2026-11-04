@@ -264,8 +264,9 @@ export function ServerProvider({
         writeStorage(URL_STORAGE_KEY, rawUrl);
         writeStorage(TOKEN_STORAGE_KEY, config.token);
 
-        // Registry: use cache instantly if we have it, then refresh anyway
-        // (the user explicitly connected, so a fetch is expected).
+        // Registry: show cache immediately, then sync once for this connection.
+        // Not live / not per-pattern — manual resync is refreshPatterns only.
+        // 连上时同步一次；会话内用本地副本。
         const normalized = client.endpoints.base;
         const cache = readPatternCache(normalized);
         if (cache != null) {

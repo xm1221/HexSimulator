@@ -57,3 +57,13 @@ HexSimulator 的「画出的图案」模式始终发送 `方向_签名` token，
 ```
 
 混合内容注意：`https` 页面不能直接打 `http://127.0.0.1`。
+
+## `patterns.list`
+
+客户端在**建立连接时调用一次**（仅在手动「刷新图案」时再调）。`data` 形状与英文 PROTOCOL 相同：`patterns[]` 含 `id` / `startdir` / `signature` / `aliases` / `perWorld` / `nameKey` / `names`。
+
+图案在会话内使用本地缓存，**不要**画图时实时向服务端按图案查询。
+
+`stack` / `cast` 的 `ravenmind` 为 iota JSON 对象（或 `null`）。
+
+预检若带 `Access-Control-Request-Private-Network: true`，服务端应回 `Access-Control-Allow-Private-Network: true`。https 页访问本机 http 仍可能被混合内容拦截，此时请用本地 `yarn dev` 或给 HexCLI 加 TLS/反代。

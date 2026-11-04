@@ -72,6 +72,8 @@ that form plus `num_<n>` and names to be fully usable from the canvas.
 | `step.next` | — | Execute one top-level iota |
 | `step.abort` | — | Abort step session (stack kept) |
 | `complete` | — | Pattern id completion list (optional for UIs) |
+| `patterns.list` (alias `patterns`) | — | Dump the **live** action registry for the client to cache once per connection |
+
 | `profile.list` / `profile.show` / `profile.use` | `name` for use | Optional |
 | `env.list` / `env.use` | `id` for use (`"auto"` ok) | Optional |
 
@@ -180,6 +182,37 @@ See MieLib `HEXCLI.md` / `docs/hexcli-http.md` for bind address, CORS, and token
 `protocol: 1` in `/v1/health`. Breaking changes bump the number.
 
 ---
+
+### `patterns.list`
+
+Clients call this **once** when a connection is established (and again only on manual resync). Response `data`:
+
+```json
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "hexcasting:add",
+      "startdir": "NORTH_EAST",
+      "signature": "waaw",
+      "aliases": ["add", "hexcasting:add"],
+      "perWorld": false,
+      "nameKey": "hexcasting.action.hexcasting:add",
+      "names": { "en_us": "…" }
+    }
+  ],
+  "numbers": {},
+  "count": 123,
+  "perWorldCount": 4
+}
+```
+
+`data.ravenmind` on `stack` / `cast` is an **iota JSON object** (or `null`), same schema as stack entries — not a bare string.
+
+### Private Network Access
+
+Servers SHOULD answer `Access-Control-Allow-Private-Network: true` when the preflight includes `Access-Control-Request-Private-Network: true`. This may help an https UI talk to `http://127.0.0.1`; mixed content can still block the request — then use local http for both ends or TLS on the server.
+
 
 ## 中文
 
