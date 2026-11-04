@@ -21,6 +21,7 @@ Also see: [PROTOCOL.zh-CN.md](./PROTOCOL.zh-CN.md) (Chinese-first mirror).
 - Optional auth: header `Authorization: Bearer <token>` or JSON field `"token"`.
 - CORS: server must allow the page origin (configurable allowlist; `*` only for local debug).
 - `GET /v1/health` → `{ "ok": true, "protocol": 1, "server": "mielib-hexcli", "version": "..." }` (no auth required).
+- `POST /resolve?signature=<angles>` → JSON string, e.g. `"evaluated"` (no auth required; root path, not under `/v1`). See below.
 - Mixed content: an `https://` HexSimulator page cannot call `http://` servers in most browsers. Use local `http` for both, or put TLS on the HexCLI side / use a same-origin reverse proxy.
 
 ### Request
@@ -209,6 +210,38 @@ Clients call this **once** when a connection is established (and again only on m
 
 `data.ravenmind` on `stack` / `cast` is an **iota JSON object** (or `null`), same schema as stack entries — not a bare string.
 
+### `POST /resolve` (HexTools Dynamic Pattern Resolution)
+
+HexTools's staff-grid **Dynamic Pattern Resolution URL** posts each drawn pattern to
+`{base}/resolve` to colour it. This is a separate, **unauthenticated** endpoint at the **host root**
+(`new URL("/resolve", base)` drops any path such as `/v1`); it is not an RPC `cmd`.
+
+```http
+POST /resolve?signature=waaw
+```
+
+Body is unused. The response is a **JSON string** (not an object):
+
+```json
+"evaluated"
+```
+
+| Result | Meaning |
+|--------|---------|
+| `"invalid"` | `signature` missing or empty |
+| `"evaluated"` | Registration matches a live action (per-world great spells compared with the current world's canonical strokes) |
+| `"unresolved"` | No match |
+| `"escaped"` / `"undone"` / `"errored"` | Cast-time states; a static registry lookup does not produce them (a server failure may answer `"errored"`) |
+
+The lookup uses the same live action registry as `patterns.list` and never casts. Servers SHOULD
+apply the same CORS / Private Network Access rules as `/v1/*`. This endpoint is for HexTools; a
+HexSimulator client still caches `patterns.list` once per connection.
+
+When HexSimulator connects to a HexCLI server and its Dynamic Pattern Resolution URL is empty (or
+still holds the origin auto-filled by the previous connection), the UI fills it with that server's
+**origin** (`http://127.0.0.1:8742`), so `new URL("/resolve", url)` hits `{origin}/resolve`. A URL
+typed by the user is never overwritten.
+
 ### Private Network Access
 
 Servers SHOULD answer `Access-Control-Allow-Private-Network: true` when the preflight includes `Access-Control-Request-Private-Network: true`. This may help an https UI talk to `http://127.0.0.1`; mixed content can still block the request — then use local http for both ends or TLS on the server.
@@ -229,6 +262,7 @@ Servers SHOULD answer `Access-Control-Allow-Private-Network: true` when the pref
 - 鉴权：请求头 `Authorization: Bearer <token>`，或 JSON 字段 `"token"`。
 - CORS：服务端按可配置白名单放行页面来源（本地调试才可用 `*`）。
 - `GET /v1/health` → `{ "ok": true, "protocol": 1, "server": "mielib-hexcli", "version": "..." }`（可不鉴权）。
+- `POST /resolve?signature=<角度>` → JSON 字符串，如 `"evaluated"`（免鉴权；在主机根下，不在 `/v1` 之下）。详见下文。
 - 混合内容：`https://` 页面通常无法请求 `http://` 服务端。本地请前后端都用 `http`，或给 HexCLI 配 TLS / 同源反代。
 
 ### 请求 / 命令 / 响应 / Iota
@@ -242,6 +276,32 @@ Iota 对象必有 `type` / `text` / `color` / `rich`；数字可有 `value`，�
 栈顺序：**底 → 顶**。有 `data.cast` 时优先读 `data.cast.stack`，否则读 `data.stack`。
 
 `data.step`：`total`、`index`（**下一个**待执行 iota 的下标，完成后等于 `total`）、`done`，可选 `executed`（最近一次 `step.next` 执行的下标）、`preview`（未完成的下一 iota）、`stopped`（提前结束的原因，如 `"mishap"`）。
+
+### `POST /resolve`（HexTools 动态图案解析）
+
+HexTools 法杖画板的 **Dynamic Pattern Resolution URL** 会把每个画出的图案 POST 到 `{base}/resolve`
+决定颜色。它是独立的**免鉴权**端点，位于**主机根**下（`new URL("/resolve", base)` 会丢掉 `/v1` 之类的路径），
+不是 RPC 的 `cmd`。
+
+```http
+POST /resolve?signature=waaw
+```
+
+body 不用。响应体是 **JSON 字符串**（不是对象）：
+
+```json
+"evaluated"
+```
+
+| 结果 | 含义 |
+|------|------|
+| `"invalid"` | `signature` 缺失或为空 |
+| `"evaluated"` | 命中当前动作注册表（per-world 大法术按当前世界的 canonical 笔画比较） |
+| `"unresolved"` | 没有命中 |
+| `"escaped"` / `"undone"` / `"errored"` | 施法期状态，静态查表不会产生（服务端内部失败可回 `"errored"`） |
+
+查表与 `patterns.list` 同源，不会施法。服务端应与 `/v1/*` 采用相同的 CORS / Private Network Access 规则。
+该端点供 HexTools 使用；HexSimulator 客户端仍然每连接缓存一次 `patterns.list`。
 
 ### MieLib 启用
 

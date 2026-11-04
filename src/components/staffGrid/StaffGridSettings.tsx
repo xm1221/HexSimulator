@@ -7,6 +7,7 @@ import {
   SegmentedControl,
   Stack,
   Switch,
+  Text,
   TextInput,
 } from "@mantine/core";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
@@ -18,6 +19,7 @@ import { mod } from "@hextools/renderer";
 import { MAX_GRID_ZOOM, MIN_GRID_ZOOM } from "@hextools/renderer/staffGrid";
 
 import { useI18n } from "../../i18n/I18nContext";
+import { useServer } from "../../simulator/ServerContext";
 import type { KeysOfValue } from "../../utils/types";
 import {
   staffGridButtonProps,
@@ -56,6 +58,7 @@ export default function StaffGridSettings({
   const [opened, { open, close }] = useDisclosure(false);
   const isMobile = useMediaQuery("(max-width: 30em)");
   const { t } = useI18n();
+  const { status, origin } = useServer();
 
   const {
     canRequestPermission: canRequestMotionPermission,
@@ -254,6 +257,12 @@ export default function StaffGridSettings({
                     })
                   }
                 />
+
+                {status === "connected" && origin != null && (
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {t("settings.dynamicResolutionHexCliHint", { origin })}
+                  </Text>
+                )}
 
                 <Button
                   mt="md"

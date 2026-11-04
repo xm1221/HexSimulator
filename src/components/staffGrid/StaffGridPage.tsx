@@ -17,6 +17,11 @@ import {
 import { patternsToCode } from "../../hexparse";
 import { useI18n } from "../../i18n/I18nContext";
 import { useServer } from "../../simulator/ServerContext";
+import {
+  isAutoFilledResolveUrl,
+  readAutoResolveOrigin,
+  writeAutoResolveOrigin,
+} from "../../simulator/resolveUrl";
 import HexParseInput from "./HexParseInput";
 import RavenmindPanel from "./RavenmindPanel";
 import StackPanel from "./StackPanel";
@@ -30,7 +35,7 @@ export default function StaffGridPage() {
   const isTouchscreen = useIsTouchscreen();
   const isNarrow = useMediaQuery("(max-width: 30em)");
   const { t } = useI18n();
-  const { status, run, error } = useServer();
+  const { status, origin, run, error } = useServer();
 
   const [patterns, patternsHandlers, patternsHistory] = useStateHistory<
     readonly ResolvedPattern[]
@@ -50,9 +55,10 @@ export default function StaffGridPage() {
 
   const [hexCode, setHexCode] = useState("num_1 num_2 add");
   const [sourceMode, setSourceMode] = useState<SourceMode>("code");
-  const [toast, setToast] = useState<{ text: string; kind: "ok" | "error" } | null>(
-    null,
-  );
+  const [toast, setToast] = useState<{
+    text: string;
+    kind: "ok" | "error";
+  } | null>(null);
 
   const notify = useCallback((text: string, kind: "ok" | "error" = "ok") => {
     setToast({ text, kind });
@@ -92,6 +98,37 @@ export default function StaffGridPage() {
       hasDynamicResolutionURL ? PATTERN_TYPES.Unresolved : DEFAULT_PATTERN_TYPE,
     );
   }
+
+  // A successful HexCLI connection doubles as the Dynamic Pattern Resolution
+  // server: fill the URL with the server origin unless the user typed their
+  // own. An origin we auto-filled earlier may be replaced on a later connect;
+  // a manual URL never is. Disconnect leaves the value as-is.
+  const resolveAutoOriginRef = useRef<string | null>(readAutoResolveOrigin());
+  const settingsRef = useRef(settings);
+  // eslint-disable-next-line react-hooks/refs
+  settingsRef.current = settings;
+  const setSettingsRef = useRef(setSettings);
+  // eslint-disable-next-line react-hooks/refs
+  setSettingsRef.current = setSettings;
+
+  useEffect(() => {
+    if (status !== "connected" || origin == null) {
+      return;
+    }
+    const current = settingsRef.current.dynamicResolutionURL;
+    if (!isAutoFilledResolveUrl(current, resolveAutoOriginRef.current)) {
+      return;
+    }
+    resolveAutoOriginRef.current = origin;
+    writeAutoResolveOrigin(origin);
+    setSettingsRef.current({
+      ...settingsRef.current,
+      dynamicResolutionURL: origin,
+      // The /resolve server decides the colour; manual colouring is moot.
+      autoPatternType: false,
+      enableEditingPatterns: false,
+    });
+  }, [status, origin]);
 
   useHotkeys([
     ["Escape", () => staffGridRef.current?.cancelPattern()],

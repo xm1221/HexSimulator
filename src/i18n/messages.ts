@@ -139,6 +139,8 @@ const en = {
   "settings.dynamicResolutionURL": "Dynamic Pattern Resolution URL",
   "settings.dynamicResolutionDescription":
     "When set, all drawn patterns are sent to the /resolve endpoint of this URL to determine the pattern's color.",
+  "settings.dynamicResolutionHexCliHint":
+    "Connected HexCLI: {origin}. It is auto-filled as the Dynamic Pattern Resolution URL when the field is empty or still points at the last connected server.",
   "settings.resetAll": "Reset All Settings",
   "settings.motionPermissionDenied": "Device motion permission denied :(",
 
@@ -300,6 +302,8 @@ const zh: Record<MessageKey, string> = {
   "settings.dynamicResolutionURL": "动态图案解析 URL",
   "settings.dynamicResolutionDescription":
     "设置后，所有绘制的图案都会发送到此 URL 的 /resolve 端点，以确定图案的颜色。",
+  "settings.dynamicResolutionHexCliHint":
+    "已连接 HexCLI：{origin}。当该字段为空或仍指向上次连接的服务器时，会自动填入为动态图案解析 URL。",
   "settings.resetAll": "重置所有设置",
   "settings.motionPermissionDenied": "设备运动权限被拒绝 :(",
 

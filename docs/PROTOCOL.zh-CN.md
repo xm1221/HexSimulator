@@ -16,6 +16,7 @@
 |------|------|------|
 | `GET` | `/v1/health` | `{ok, protocol:1, server, version}`，可不鉴权 |
 | `POST` | `/v1/rpc` | 执行命令，见下 |
+| `POST` | `/resolve?signature=<角度>` | HexTools 动态图案解析；返回 JSON 字符串，免鉴权（主机根下，不在 `/v1`） |
 
 鉴权：`Authorization: Bearer <token>` 或 JSON `token`。CORS 白名单可配。
 
@@ -67,3 +68,23 @@ HexSimulator 的「画出的图案」模式始终发送 `方向_签名` token，
 `stack` / `cast` 的 `ravenmind` 为 iota JSON 对象（或 `null`）。
 
 预检若带 `Access-Control-Request-Private-Network: true`，服务端应回 `Access-Control-Allow-Private-Network: true`。https 页访问本机 http 仍可能被混合内容拦截，此时请用本地 `yarn dev` 或给 HexCLI 加 TLS/反代。
+
+## `POST /resolve`（HexTools 动态图案解析）
+
+HexTools 画板把每个画出的图案 POST 到 `{base}/resolve?signature=<角度签名>`（如 `?signature=waaw`）来决定颜色。
+这是独立的**免鉴权**端点，位于**主机根**（不在 `/v1` 之下），body 不用。
+
+响应体是 **JSON 字符串**，如 `"evaluated"`：
+
+| 结果 | 含义 |
+|------|------|
+| `"invalid"` | `signature` 缺失或为空 |
+| `"evaluated"` | 命中当前动作注册表（per-world 大法术用当前世界的 canonical 笔画） |
+| `"unresolved"` | 没有命中 |
+| `"escaped"` / `"undone"` / `"errored"` | 施法期状态，静态查表不会产生（内部失败可回 `"errored"`） |
+
+与 `/v1/*` 使用相同的 CORS / PNA 规则。该端点供 HexTools 使用；HexSimulator 仍按 `patterns.list` 缓存图案。
+
+HexSimulator 连上 HexCLI 后，若「动态图案解析 URL」为空（或仍是上次连接自动填入的 origin），
+会用该服务器的 **origin**（如 `http://127.0.0.1:8742`）自动填入，使 `new URL("/resolve", url)` 命中
+`{origin}/resolve`。用户手动输入的 URL 不会被覆盖。

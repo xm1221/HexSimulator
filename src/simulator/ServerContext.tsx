@@ -32,6 +32,7 @@ import {
 import { RpcClient, RpcError, normalizeEndpoints } from "../server/client.ts";
 import type { HealthResponse, Iota, StepInfo } from "../server/types.ts";
 import { mergeStack, toSnapshot, type CastSnapshot } from "../server/types.ts";
+import { serverOriginOf } from "./resolveUrl.ts";
 
 export const DEFAULT_BASE_URL = "http://127.0.0.1:8742";
 export const URL_STORAGE_KEY = "hexsimulator:server-url";
@@ -63,6 +64,8 @@ export interface ServerContextValue {
   baseUrl: string;
   token: string;
   status: ConnectionStatus;
+  /** Scheme + host + port of the connected server (no path). */
+  origin: string | null;
   health: HealthResponse | null;
   error: ServerError | null;
   privateNetworkSuspected: boolean;
@@ -151,6 +154,7 @@ export function ServerProvider({
   const [baseUrl, setBaseUrl] = useState(() => readStorage(URL_STORAGE_KEY));
   const [token, setToken] = useState(() => readStorage(TOKEN_STORAGE_KEY));
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
+  const [origin, setOrigin] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<ServerError | null>(null);
   const [privateNetworkSuspected, setPrivateNetworkSuspected] = useState(false);
@@ -237,6 +241,7 @@ export function ServerProvider({
       setStatus("connecting");
       setError(null);
       setHealth(null);
+      setOrigin(null);
       setBaseUrl(rawUrl);
       setToken(config.token);
 
@@ -260,6 +265,8 @@ export function ServerProvider({
         }
         setHealth(healthReply);
         setStatus("connected");
+        // Origin drives the Dynamic Pattern Resolution URL default.
+        setOrigin(serverOriginOf(client.endpoints.base));
         // Only persist a URL that actually worked.
         writeStorage(URL_STORAGE_KEY, rawUrl);
         writeStorage(TOKEN_STORAGE_KEY, config.token);
@@ -302,6 +309,7 @@ export function ServerProvider({
     clientRef.current = null;
     setStatus("disconnected");
     setHealth(null);
+    setOrigin(null);
     setError(null);
     setStep(null);
     setSnapshot(null);
@@ -415,6 +423,7 @@ export function ServerProvider({
       baseUrl,
       token,
       status,
+      origin,
       health,
       error,
       privateNetworkSuspected,
@@ -439,6 +448,7 @@ export function ServerProvider({
       baseUrl,
       token,
       status,
+      origin,
       health,
       error,
       privateNetworkSuspected,
