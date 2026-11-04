@@ -1,9 +1,5 @@
 {
   "name": "HexSimulator + HexCLI backend (Codespaces)",
-
-  // Base image + Java 17 feature: Minecraft 1.20.1 / Fabric needs Java 17.
-  // The frontend itself is a static Vite app; Node is here so `yarn dev` works
-  // in the same codespace.
   "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
     "ghcr.io/devcontainers/features/java:1": {
@@ -14,22 +10,14 @@
     },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
     }
   },
-
-  // 8742 = HexCLI HTTP endpoint (GET /v1/health, POST /v1/rpc, POST /resolve).
-  // 25565 (the Minecraft game port) is deliberately NOT forwarded: HexSimulator
-  // only needs the HTTP endpoint, and forwarding 25565 would expose a game server.
-  //
-  // Codespaces always forwards a new port as *private*, and devcontainer.json has
-  // no portable way to set the visibility (the Dev Container spec has no
-  // `visibility` port attribute), so the browser would need a session cookie and
-  // hexsim.xm1221.cn could not reach it. Make it public once per codespace:
-  //
-  //   gh codespace ports visibility 8742:public -c <codespace-name>
-  //
-  // `postStartCommand` prints this command too. See README.md.
-  "forwardPorts": [8742],
+  "forwardPorts": [
+    8742
+  ],
   "portsAttributes": {
     "8742": {
       "label": "HexCLI HTTP (/v1 + /resolve)",
@@ -37,24 +25,19 @@
       "onAutoForward": "notify"
     }
   },
-
-  // Runs on every start (including after the codespace wakes from idle):
-  // installs HexCLI via the MieLib one-click installer on first run, then
-  // builds/uses a MieLib jar that has the HTTP endpoint and starts the server
-  // in the background. Idempotent: exits immediately when it is already up.
   "postStartCommand": "bash .devcontainer/start-hexcli.sh",
-
-  // Minecraft server + Gradle build need more than the smallest machine type.
   "hostRequirements": {
     "cpus": 4,
     "memory": "8gb",
     "storage": "32gb"
   },
-
   "remoteUser": "vscode",
   "customizations": {
     "vscode": {
-      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
     }
   }
 }
